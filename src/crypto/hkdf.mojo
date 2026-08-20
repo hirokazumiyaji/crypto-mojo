@@ -145,7 +145,9 @@ struct _HKDFReader[H: HashFunction](Copyable, Movable):
         self._emitted = 0
 
     def read(mut self, length: Int) raises -> List[UInt8]:
-        if length < 0 or self._emitted + length > 255 * Self.H.digest_size:
+        # Compare via subtraction (not `self._emitted + length`) so a huge
+        # `length` cannot overflow `Int` and bypass the max-length check.
+        if length < 0 or length > 255 * Self.H.digest_size - self._emitted:
             raise Error("HKDF output length is out of range")
 
         var output = List[UInt8](capacity=length)

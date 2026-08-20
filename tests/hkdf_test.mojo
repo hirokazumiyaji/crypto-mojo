@@ -175,5 +175,20 @@ def test_hkdf_reader_rejects_over_max() raises:
         _ = reader.read(255 * 32 + 1)
 
 
+def test_hkdf_reader_rejects_overflowing_length() raises:
+    # A naive `self._emitted + length > max` check wraps around for a huge
+    # `length`, making the comparison falsely pass. Read a few bytes first so
+    # `self._emitted` is nonzero, then request a length near Int's positive
+    # limit that would overflow the addition.
+    var prk = extract_sha256(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = List[UInt8]()
+    var reader = HKDF_SHA256(prk[:], info[:])
+    _ = reader.read(8)
+    with assert_raises():
+        _ = reader.read(9223372036854775807)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
