@@ -6,6 +6,8 @@ from ._common import (
     HashFunction,
     append_le_u32,
     bytes_to_hex,
+    copy_to_buffer,
+    load_le_u32_words,
     read_le_u32,
     read_le_u64,
     simd_lanes_le_u32,
@@ -40,6 +42,7 @@ comptime _ROOT = UInt32(8)
 comptime _KEYED_HASH = UInt32(16)
 
 
+@always_inline
 def _g(
     mut v: InlineArray[UInt32, 16],
     a: Int,
@@ -59,6 +62,7 @@ def _g(
     v[b] = rotate_bits_right[7](v[b] ^ v[c])
 
 
+@always_inline
 def _compress(
     input_cv: InlineArray[UInt32, 8],
     block_words: InlineArray[UInt32, 16],
@@ -157,13 +161,25 @@ def _compress(
     return output^
 
 
+@always_inline
 def _bytes_to_words(data: Span[Byte, _]) -> InlineArray[UInt32, 16]:
+    if len(data) == 64:
+        return _full_block_words(data, 0)
     var words = InlineArray[UInt32, 16](fill=0)
     var full_words = len(data) // 4
     for i in range(full_words):
         words[i] = read_le_u32(data, i * 4)
     for i in range(full_words * 4, len(data)):
         words[full_words] |= data[i].cast[DType.uint32]() << UInt32(i % 4 * 8)
+    return words^
+
+
+@always_inline
+def _full_block_words(
+    data: Span[Byte, _], offset: Int
+) -> InlineArray[UInt32, 16]:
+    var words = InlineArray[UInt32, 16](uninitialized=True)
+    words.unsafe_ptr().unsafe_store(load_le_u32_words[16](data, offset))
     return words^
 
 
@@ -239,9 +255,8 @@ struct _BLAKE3ChunkState(Copyable, Movable):
     def is_full(self) -> Bool:
         return self._blocks_compressed == 15 and self._block_len == 64
 
-    def _compress_block(mut self):
-        var block_span = Span(self._block)
-        var words = _bytes_to_words(block_span)
+    @always_inline
+    def _apply_block(mut self, words: InlineArray[UInt32, 16]):
         var flags = self._flags
         if self._blocks_compressed == 0:
             flags |= _CHUNK_START
@@ -255,6 +270,11 @@ struct _BLAKE3ChunkState(Copyable, Movable):
         for i in range(8):
             self._cv[i] = output[i]
         self._blocks_compressed += 1
+
+    def _compress_block(mut self):
+        var block_span = Span(self._block)
+        var words = _bytes_to_words(block_span)
+        self._apply_block(words)
         self._block_len = 0
 
     def update(mut self, data: Span[Byte, _]) -> Int:
@@ -264,9 +284,19 @@ struct _BLAKE3ChunkState(Copyable, Movable):
                 break
             if self._block_len == 64:
                 self._compress_block()
+            # Fast path: compress whole blocks straight from the input while
+            # more data follows, so the chunk's final block stays buffered.
+            while (
+                self._block_len == 0
+                and self._blocks_compressed < 15
+                and len(data) - offset > 64
+            ):
+                self._apply_block(_full_block_words(data, offset))
+                offset += 64
             var available = min(64 - self._block_len, len(data) - offset)
-            for i in range(available):
-                self._block[self._block_len + i] = data[offset + i]
+            copy_to_buffer(
+                self._block, self._block_len, data, offset, available
+            )
             self._block_len += available
             offset += available
         return offset

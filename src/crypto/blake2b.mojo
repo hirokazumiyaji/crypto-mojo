@@ -6,7 +6,8 @@ from ._common import (
     HashFunction,
     append_le_u64,
     bytes_to_hex,
-    read_le_u64,
+    copy_to_buffer,
+    load_le_u64_words,
     simd_lanes_le_u64,
 )
 
@@ -36,6 +37,7 @@ comptime _SIGMA: List[List[Int]] = [
 ]
 
 
+@always_inline
 def _g(
     mut v: InlineArray[UInt64, 16],
     a: Int,
@@ -55,10 +57,10 @@ def _g(
     v[b] = rotate_bits_right[63](v[b] ^ v[c])
 
 
+@always_inline
 def _block_words(block: Span[Byte, _]) -> InlineArray[UInt64, 16]:
     var words = InlineArray[UInt64, 16](uninitialized=True)
-    for i in range(16):
-        words[i] = read_le_u64(block, i * 8)
+    words.unsafe_ptr().unsafe_store(load_le_u64_words[16](block, 0))
     return words^
 
 
@@ -94,6 +96,7 @@ struct _BLAKE2bCore(Copyable, Movable):
         if self._t0 < previous:
             self._t1 += 1
 
+    @always_inline
     def _compress_words(mut self, m: InlineArray[UInt64, 16]):
         var v = InlineArray[UInt64, 16](uninitialized=True)
         comptime for i in range(8):
@@ -151,8 +154,7 @@ struct _BLAKE2bCore(Copyable, Movable):
         if self._buffer_len > 0:
             var needed = 128 - self._buffer_len
             var available = min(needed, len(data))
-            for i in range(available):
-                self._buffer[self._buffer_len + i] = data[i]
+            copy_to_buffer(self._buffer, self._buffer_len, data, 0, available)
             self._buffer_len += available
             offset = available
             if self._buffer_len == 128 and offset < len(data):
@@ -162,9 +164,9 @@ struct _BLAKE2bCore(Copyable, Movable):
             self._increment_counter(UInt64(128))
             self._compress_words(_block_words(data[offset : offset + 128]))
             offset += 128
-        for i in range(offset, len(data)):
-            self._buffer[self._buffer_len] = data[i]
-            self._buffer_len += 1
+        var remaining = len(data) - offset
+        copy_to_buffer(self._buffer, self._buffer_len, data, offset, remaining)
+        self._buffer_len += remaining
 
     def _update_with_simd(mut self, value: SIMD[_, _]):
         var bytes = simd_lanes_le_u64(value)

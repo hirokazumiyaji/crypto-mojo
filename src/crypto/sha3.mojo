@@ -6,6 +6,8 @@ from ._common import (
     HashFunction,
     append_le_u64,
     bytes_to_hex,
+    copy_to_buffer,
+    load_le_u64_words,
     read_le_u64,
     simd_lanes_le_u64,
 )
@@ -48,10 +50,11 @@ comptime _ROTATION_OFFSETS: List[List[Int]] = [
 ]
 
 
+@always_inline
 def _block_lanes(block: Span[Byte, _]) -> InlineArray[UInt64, 17]:
     var lanes = InlineArray[UInt64, 17](uninitialized=True)
-    for i in range(17):
-        lanes[i] = read_le_u64(block, i * 8)
+    lanes.unsafe_ptr().unsafe_store(load_le_u64_words[16](block, 0))
+    lanes[16] = read_le_u64(block, 128)
     return lanes^
 
 
@@ -69,35 +72,40 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
         self._buffer_len = 0
 
     def _permute(mut self):
+        # Work on a local copy so the state lives in registers instead of
+        # going through `self` on every access.
+        var state = self._state.copy()
         var c = InlineArray[UInt64, 5](uninitialized=True)
         var d = InlineArray[UInt64, 5](uninitialized=True)
         var b = InlineArray[UInt64, 5 * 5](uninitialized=True)
         comptime for round in range(24):
             comptime for x in range(5):
                 c[x] = (
-                    self._state[x]
-                    ^ self._state[x + 5]
-                    ^ self._state[x + 10]
-                    ^ self._state[x + 15]
-                    ^ self._state[x + 20]
+                    state[x]
+                    ^ state[x + 5]
+                    ^ state[x + 10]
+                    ^ state[x + 15]
+                    ^ state[x + 20]
                 )
             comptime for x in range(5):
                 d[x] = c[(x + 4) % 5] ^ rotate_bits_left[1](c[(x + 1) % 5])
             comptime for y in range(5):
                 comptime for x in range(5):
-                    self._state[x + 5 * y] ^= d[x]
+                    state[x + 5 * y] ^= d[x]
             comptime for y in range(5):
                 comptime for x in range(5):
                     b[y + 5 * ((2 * x + 3 * y) % 5)] = rotate_bits_left[
                         _ROTATION_OFFSETS[y][x]
-                    ](self._state[x + 5 * y])
+                    ](state[x + 5 * y])
             comptime for y in range(5):
                 comptime for x in range(5):
-                    self._state[x + 5 * y] = b[x + 5 * y] ^ (
+                    state[x + 5 * y] = b[x + 5 * y] ^ (
                         (~b[(x + 1) % 5 + 5 * y]) & b[(x + 2) % 5 + 5 * y]
                     )
-            self._state[0] ^= materialize[_ROUND_CONSTANTS[round]]()
+            state[0] ^= materialize[_ROUND_CONSTANTS[round]]()
+        self._state = state^
 
+    @always_inline
     def _absorb(mut self, lanes: InlineArray[UInt64, 17]):
         for i in range(17):
             self._state[i] ^= lanes[i]
@@ -113,8 +121,7 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
         if self._buffer_len > 0:
             var needed = 136 - self._buffer_len
             var available = min(needed, len(data))
-            for i in range(available):
-                self._buffer[self._buffer_len + i] = data[i]
+            copy_to_buffer(self._buffer, self._buffer_len, data, 0, available)
             self._buffer_len += available
             offset = available
             if self._buffer_len == 136:
@@ -122,9 +129,9 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
         while offset + 136 <= len(data):
             self._absorb(_block_lanes(data[offset : offset + 136]))
             offset += 136
-        for i in range(offset, len(data)):
-            self._buffer[self._buffer_len] = data[i]
-            self._buffer_len += 1
+        var remaining = len(data) - offset
+        copy_to_buffer(self._buffer, self._buffer_len, data, offset, remaining)
+        self._buffer_len += remaining
 
     def _update_with_bytes(mut self, data: Span[Byte, _]):
         self.update_bytes(data)
