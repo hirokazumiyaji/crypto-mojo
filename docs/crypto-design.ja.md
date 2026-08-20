@@ -62,20 +62,26 @@ crypto
 各ハッシュ型はMojo標準の`std.hashlib.Hasher` traitに準拠し続ける。
 `crypto.__init__`はサブモジュールの型や関数を一括で再公開しない。
 
-HMAC、HKDF、PBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
+HMACは汎用の`HMAC[H: HashFunction]`に加えて、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3を正式にサポートする。
+HKDFとPBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
 MD5とSHA-1は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
 
 ## 公開API
 
 ### HMAC
 
-`crypto.hmac`は次の具象型を公開する。
+`crypto.hmac`は汎用の`HMAC[H: HashFunction]`から構築した次の具象型を公開する。
 
 ```mojo
 HMAC_SHA256(key: Span[Byte, _])
 HMAC_SHA384(key: Span[Byte, _])
 HMAC_SHA512(key: Span[Byte, _])
+HMAC_SHA3_256(key: Span[Byte, _])
+HMAC_BLAKE2b(key: Span[Byte, _])
+HMAC_BLAKE3(key: Span[Byte, _])
 ```
+
+`SHA3_256`、`BLAKE2b`、`BLAKE3`は固定の`block_size`/`digest_size`で`crypto._common.HashFunction`に準拠し、`HMAC[H]`が型チェックを通るようにする。`SHA3_256`は136/32、`BLAKE2b`は128/64(`Defaultable`によるデフォルト構築で出力を64 byteに固定する。可変長出力用の`BLAKE2b(digest_size=…)`はHMACの経路には使わない)、`BLAKE3`は64/32(unkeyedのデフォルト構築を使う。BLAKE3のkeyed hashモードはHMACに統合しない別機能のままとする)。
 
 各型は次の操作を持つ。
 
@@ -95,6 +101,9 @@ verify(var self, expected: Span[Byte, _]) -> Bool
 hmac_sha256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha384(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha512(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_sha3_256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_blake2b(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_blake3(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 ```
 
 HMAC型は標準`Hasher` traitに準拠しない。
@@ -226,6 +235,10 @@ HMACはRFC 4231のSHA-256、SHA-384、SHA-512テストベクトルで検証す�
 一つの入力を一度に渡した結果と複数回の`update_bytes`で渡した結果が一致することも検証する。
 空入力、ブロック長より長い鍵、MACの一致、不一致、長さ違いを含める。
 
+HMAC-SHA3-256は公開されているテストベクトルで検証する。
+HMAC-BLAKE2bとHMAC-BLAKE3は独立実装との事前照合を経て埋め込んだ固定ベクトルで検証する。
+複数回の`update_bytes`によるストリーミングがワンショット関数の結果と一致することも検証する。
+
 HKDF-SHA-256はRFC 5869のテストベクトルで検証する。
 SHA-384版とSHA-512版はGoの独立実装と事前に照合した固定ベクトルで検証する。
 長さ0、最大長、最大長超過も検証する。
@@ -261,7 +274,6 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 
 次の項目はこのマイルストーンに含めない。
 
-- HMAC-SHA3とHMAC-BLAKE
 - HKDFのreader API
 - 状態のreset、clone、serialize
 - 暗号学的乱数生成

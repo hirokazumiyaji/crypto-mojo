@@ -3,6 +3,7 @@ from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
 from ._common import (
+    HashFunction,
     append_le_u64,
     bytes_to_hex,
     read_le_u64,
@@ -61,7 +62,7 @@ def _block_words(block: Span[Byte, _]) -> InlineArray[UInt64, 16]:
     return words^
 
 
-struct _BLAKE2bCore:
+struct _BLAKE2bCore(Copyable, Movable):
     var _h: InlineArray[UInt64, 8]
     var _buffer: InlineArray[UInt8, 128]
     var _buffer_len: Int
@@ -193,7 +194,10 @@ struct _BLAKE2bCore:
         return self._h[0]
 
 
-struct BLAKE2b(Defaultable, Hasher):
+struct BLAKE2b(Copyable, Defaultable, HashFunction, Hasher, Movable):
+    comptime block_size = 128
+    comptime digest_size = 64
+
     var _core: _BLAKE2bCore
 
     def __init__(out self):

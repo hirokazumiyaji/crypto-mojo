@@ -32,7 +32,7 @@ print(sha256^.hexdigest())
 MD5とSHA-1は既存データや古い形式との互換性確認に限って使用してください。
 いずれも衝突耐性が必要な新しい設計、署名、証明書、パスワード保存には適しません。
 
-HMACはSHA-256、SHA-384、SHA-512のストリーミング型とワンショット関数を提供します。
+HMACはSHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3のストリーミング型とワンショット関数を提供します。
 
 ```mojo
 from crypto.hmac import HMAC_SHA256, hmac_sha256
@@ -44,6 +44,9 @@ var tag = mac^.digest()
 
 var one_shot_tag = hmac_sha256(key, "message".as_bytes())
 ```
+
+`HMAC_SHA3_256`/`hmac_sha3_256`、`HMAC_BLAKE2b`/`hmac_blake2b`、`HMAC_BLAKE3`/`hmac_blake3`も同じ形で利用できます。
+`HMAC_BLAKE2b`はダイジェスト長を64 byteに固定し、`HMAC_BLAKE3`はBLAKE3の既定のunkeyedモードを32-byteダイジェストで使います。これはBLAKE3自体のkeyed hash機能とは別物です。
 
 HKDFとPBKDF2はSHA-256、SHA-384、SHA-512を選べる具象関数を公開します。
 

@@ -32,7 +32,7 @@ print(sha256^.hexdigest())
 Use MD5 and SHA-1 only to check compatibility with existing data or legacy formats.
 Neither is suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
 
-HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, and SHA-512.
+HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3.
 
 ```mojo
 from crypto.hmac import HMAC_SHA256, hmac_sha256
@@ -44,6 +44,9 @@ var tag = mac^.digest()
 
 var one_shot_tag = hmac_sha256(key, "message".as_bytes())
 ```
+
+`HMAC_SHA3_256` / `hmac_sha3_256`, `HMAC_BLAKE2b` / `hmac_blake2b`, and `HMAC_BLAKE3` / `hmac_blake3` follow the same shape.
+`HMAC_BLAKE2b` fixes the digest size at 64 bytes; `HMAC_BLAKE3` uses BLAKE3's default unkeyed mode with a 32-byte digest, distinct from BLAKE3's own keyed-hash feature.
 
 HKDF and PBKDF2 expose concrete functions for SHA-256, SHA-384, and SHA-512.
 

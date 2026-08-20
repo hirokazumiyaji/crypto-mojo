@@ -3,6 +3,7 @@ from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
 from ._common import (
+    HashFunction,
     append_le_u32,
     bytes_to_hex,
     read_le_u32,
@@ -214,7 +215,7 @@ struct _BLAKE3Output:
         return output^
 
 
-struct _BLAKE3ChunkState:
+struct _BLAKE3ChunkState(Copyable, Movable):
     var _cv: InlineArray[UInt32, 8]
     var _chunk_counter: UInt64
     var _block: InlineArray[UInt8, 64]
@@ -299,7 +300,7 @@ def _key_words(key: Span[Byte, _]) -> InlineArray[UInt32, 8]:
     return words^
 
 
-struct _BLAKE3Core:
+struct _BLAKE3Core(Copyable, Movable):
     # One chaining value per tree level; 54 levels cover the 2^64-byte
     # (2^54-chunk) input limit.
     var _key_words: InlineArray[UInt32, 8]
@@ -412,7 +413,10 @@ struct _BLAKE3Core:
         self.update_bytes(bytes[:])
 
 
-struct BLAKE3(Defaultable, Hasher):
+struct BLAKE3(Copyable, Defaultable, HashFunction, Hasher, Movable):
+    comptime block_size = 64
+    comptime digest_size = 32
+
     var _core: _BLAKE3Core
 
     def __init__(out self):

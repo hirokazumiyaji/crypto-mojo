@@ -62,20 +62,26 @@ Move these implementations from the existing `hash-mojo` project and make them t
 Each hash type continues to conform to Mojo's standard `std.hashlib.Hasher` trait.
 `crypto.__init__` does not re-export submodule types or functions in bulk.
 
-HMAC, HKDF, and PBKDF2 officially support only SHA-256, SHA-384, and SHA-512.
+HMAC officially supports SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3, in addition to the generic `HMAC[H: HashFunction]`.
+HKDF and PBKDF2 officially support only SHA-256, SHA-384, and SHA-512.
 Document that MD5 and SHA-1 are for compatibility with existing data only and must not be used for new security purposes.
 
 ## Public API
 
 ### HMAC
 
-`crypto.hmac` exports these concrete types:
+`crypto.hmac` exports these concrete types, built from the generic `HMAC[H: HashFunction]`:
 
 ```mojo
 HMAC_SHA256(key: Span[Byte, _])
 HMAC_SHA384(key: Span[Byte, _])
 HMAC_SHA512(key: Span[Byte, _])
+HMAC_SHA3_256(key: Span[Byte, _])
+HMAC_BLAKE2b(key: Span[Byte, _])
+HMAC_BLAKE3(key: Span[Byte, _])
 ```
+
+`SHA3_256`, `BLAKE2b`, and `BLAKE3` conform to `crypto._common.HashFunction` with fixed `block_size` / `digest_size` so `HMAC[H]` type-checks over them: `SHA3_256` is 136/32, `BLAKE2b` is 128/64 (its `Defaultable` construction fixes the output at 64 bytes; the separate `BLAKE2b(digest_size=…)` constructor for variable output remains outside the HMAC path), and `BLAKE3` is 64/32 (its unkeyed default constructor; BLAKE3's keyed-hash mode stays a separate feature, not merged into HMAC).
 
 Each type provides these operations:
 
@@ -95,6 +101,9 @@ For short inputs, export these one-shot functions:
 hmac_sha256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha384(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha512(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_sha3_256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_blake2b(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_blake3(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 ```
 
 HMAC types do not conform to the standard `Hasher` trait.
@@ -226,6 +235,10 @@ Verify HMAC against RFC 4231 test vectors for SHA-256, SHA-384, and SHA-512.
 Also verify that passing one input at once matches results from multiple `update_bytes` calls.
 Include empty inputs, keys longer than the block size, matching MACs, mismatched MACs, and length mismatches.
 
+Verify HMAC-SHA3-256 against published test vectors.
+Verify HMAC-BLAKE2b and HMAC-BLAKE3 against fixed vectors embedded after offline cross-check against an independent implementation.
+Also verify that streaming `update_bytes` calls match the one-shot functions.
+
 Verify HKDF-SHA-256 against RFC 5869 test vectors.
 Verify SHA-384 and SHA-512 with fixed vectors previously checked against an independent Go implementation.
 Also cover length 0, maximum length, and over-maximum length.
@@ -261,7 +274,6 @@ It also states the boundaries for MD5 use, constant-time execution, secret zeroi
 
 This milestone does not include:
 
-- HMAC-SHA3 and HMAC-BLAKE
 - An HKDF reader API
 - State reset, clone, or serialize
 - Cryptographic random number generation

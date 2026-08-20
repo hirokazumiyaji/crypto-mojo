@@ -1,5 +1,8 @@
 from crypto._common import HashFunction, bytes_to_hex
+from crypto.blake2b import BLAKE2b
+from crypto.blake3 import BLAKE3
 from crypto.sha256 import SHA256
+from crypto.sha3 import SHA3_256
 from crypto.sha512 import SHA384, SHA512
 from crypto.subtle import constant_time_compare
 from std.collections import List, Span
@@ -50,6 +53,9 @@ struct HMAC[H: HashFunction](Copyable, Movable):
 comptime HMAC_SHA256 = HMAC[SHA256]
 comptime HMAC_SHA384 = HMAC[SHA384]
 comptime HMAC_SHA512 = HMAC[SHA512]
+comptime HMAC_SHA3_256 = HMAC[SHA3_256]
+comptime HMAC_BLAKE2b = HMAC[BLAKE2b]
+comptime HMAC_BLAKE3 = HMAC[BLAKE3]
 
 
 def hmac[
@@ -70,3 +76,15 @@ def hmac_sha384(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
 
 def hmac_sha512(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
     return hmac[SHA512](key, data)
+
+
+def hmac_sha3_256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    return hmac[SHA3_256](key, data)
+
+
+def hmac_blake2b(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    return hmac[BLAKE2b](key, data)
+
+
+def hmac_blake3(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    return hmac[BLAKE3](key, data)
