@@ -1,6 +1,8 @@
 from crypto._common import bytes_to_hex
 from crypto.hkdf import (
     HKDF_SHA256,
+    HKDF_SHA384,
+    HKDF_SHA512,
     derive_sha256,
     derive_sha384,
     derive_sha512,
@@ -11,6 +13,8 @@ from crypto.hkdf import (
     extract_sha384,
     extract_sha512,
     reader_sha256,
+    reader_sha384,
+    reader_sha512,
 )
 from std.collections import List
 from std.testing import TestSuite, assert_equal, assert_raises
@@ -173,6 +177,87 @@ def test_hkdf_reader_rejects_over_max() raises:
     var reader = HKDF_SHA256(prk[:], info[:])
     with assert_raises():
         _ = reader.read(255 * 32 + 1)
+
+
+def test_hkdf_reader_read_zero_returns_empty() raises:
+    var prk = extract_sha256(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var reader = HKDF_SHA256(prk[:], info[:])
+    assert_equal(len(reader.read(0)), 0)
+    # An empty read must not disturb the cursor: the next read should still
+    # line up with a fresh reader's output.
+    var fresh = reader_sha256(prk[:], info[:])
+    assert_equal(reader.read(10), fresh.read(10))
+
+
+def test_hkdf_reader_sha384_matches_expand() raises:
+    var prk = extract_sha384(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var reader = reader_sha384(prk[:], info[:])
+    assert_equal(reader.read(42), expand_sha384(prk[:], info[:], 42))
+
+
+def test_hkdf_reader_sha384_sequential_reads() raises:
+    var prk = extract_sha384(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var full = expand_sha384(prk[:], info[:], 42)
+    var reader = HKDF_SHA384(prk[:], info[:])
+    var first = reader.read(10)
+    var second = reader.read(32)
+    var joined = first.copy()
+    for b in second:
+        joined.append(b)
+    assert_equal(joined, full)
+
+
+def test_hkdf_reader_sha384_rejects_over_max() raises:
+    var prk = extract_sha384(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = List[UInt8]()
+    var reader = HKDF_SHA384(prk[:], info[:])
+    with assert_raises():
+        _ = reader.read(255 * 48 + 1)
+
+
+def test_hkdf_reader_sha512_matches_expand() raises:
+    var prk = extract_sha512(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var reader = reader_sha512(prk[:], info[:])
+    assert_equal(reader.read(42), expand_sha512(prk[:], info[:], 42))
+
+
+def test_hkdf_reader_sha512_sequential_reads() raises:
+    var prk = extract_sha512(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var full = expand_sha512(prk[:], info[:], 42)
+    var reader = HKDF_SHA512(prk[:], info[:])
+    var first = reader.read(10)
+    var second = reader.read(32)
+    var joined = first.copy()
+    for b in second:
+        joined.append(b)
+    assert_equal(joined, full)
+
+
+def test_hkdf_reader_sha512_rejects_over_max() raises:
+    var prk = extract_sha512(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = List[UInt8]()
+    var reader = HKDF_SHA512(prk[:], info[:])
+    with assert_raises():
+        _ = reader.read(255 * 64 + 1)
 
 
 def test_hkdf_reader_rejects_overflowing_length() raises:
