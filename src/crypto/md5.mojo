@@ -5,7 +5,8 @@ from std.hashlib.hasher import Hasher
 from ._common import (
     append_le_u32,
     bytes_to_hex,
-    read_le_u32,
+    copy_to_buffer,
+    load_le_u32_words,
     simd_lanes_le_u64,
     write_le_u64,
 )
@@ -146,10 +147,10 @@ comptime _K = [
 ]
 
 
+@always_inline
 def _block_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
     var words = InlineArray[UInt32, 16](uninitialized=True)
-    for i in range(16):
-        words[i] = read_le_u32(block, i * 4)
+    words.unsafe_ptr().unsafe_store(load_le_u32_words[16](block, 0))
     return words^
 
 
@@ -165,9 +166,11 @@ struct MD5(Copyable, Defaultable, Hasher, Movable):
         self._buffer_len = 0
         self._bit_length = 0
 
+    @always_inline
     def _process_block(mut self, block: Span[Byte, _]):
         self._process_words(_block_words(block))
 
+    @always_inline
     def _process_words(mut self, words: InlineArray[UInt32, 16]):
         var a = self._state[0]
         var b = self._state[1]
@@ -210,8 +213,7 @@ struct MD5(Copyable, Defaultable, Hasher, Movable):
         if self._buffer_len > 0:
             var needed = 64 - self._buffer_len
             var available = min(needed, len(data))
-            for i in range(available):
-                self._buffer[self._buffer_len + i] = data[i]
+            copy_to_buffer(self._buffer, self._buffer_len, data, 0, available)
             self._buffer_len += available
             offset = available
             if self._buffer_len == 64:
@@ -219,9 +221,9 @@ struct MD5(Copyable, Defaultable, Hasher, Movable):
         while offset + 64 <= len(data):
             self._process_block(data[offset : offset + 64])
             offset += 64
-        for i in range(offset, len(data)):
-            self._buffer[self._buffer_len] = data[i]
-            self._buffer_len += 1
+        var remaining = len(data) - offset
+        copy_to_buffer(self._buffer, self._buffer_len, data, offset, remaining)
+        self._buffer_len += remaining
 
     def _update_with_bytes(mut self, data: Span[Byte, _]):
         self.update_bytes(data)

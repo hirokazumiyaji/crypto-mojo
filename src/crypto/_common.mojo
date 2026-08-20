@@ -1,4 +1,6 @@
+from std.bit import byte_swap
 from std.collections import List, Span
+from std.memory import bitcast, unsafe_memcpy
 
 comptime _HEX_DIGITS: StaticString = "0123456789abcdef"
 
@@ -24,52 +26,79 @@ def bytes_to_hex(data: List[UInt8]) -> String:
     return output^
 
 
+@always_inline
 def read_le_u32(data: Span[Byte, _], offset: Int) -> UInt32:
-    var value = data[offset].cast[DType.uint32]()
-    value |= data[offset + 1].cast[DType.uint32]() << UInt32(8)
-    value |= data[offset + 2].cast[DType.uint32]() << UInt32(16)
-    value |= data[offset + 3].cast[DType.uint32]() << UInt32(24)
-    return value
+    return bitcast[DType.uint32, 1](
+        data.unsafe_ptr().unsafe_offset(offset).unsafe_load[width=4]()
+    )
 
 
+@always_inline
 def read_le_u64(data: Span[Byte, _], offset: Int) -> UInt64:
-    var value = UInt64(0)
-    for i in range(8):
-        value |= data[offset + i].cast[DType.uint64]() << UInt64(i * 8)
-    return value
+    return bitcast[DType.uint64, 1](
+        data.unsafe_ptr().unsafe_offset(offset).unsafe_load[width=8]()
+    )
 
 
+@always_inline
 def read_be_u32(data: Span[Byte, _], offset: Int) -> UInt32:
-    var value = data[offset].cast[DType.uint32]() << UInt32(24)
-    value |= data[offset + 1].cast[DType.uint32]() << UInt32(16)
-    value |= data[offset + 2].cast[DType.uint32]() << UInt32(8)
-    value |= data[offset + 3].cast[DType.uint32]()
-    return value
+    return byte_swap(read_le_u32(data, offset))
 
 
+@always_inline
 def read_be_u64(data: Span[Byte, _], offset: Int) -> UInt64:
-    var value = UInt64(0)
-    for i in range(8):
-        value |= data[offset + i].cast[DType.uint64]() << UInt64(56 - i * 8)
-    return value
+    return byte_swap(read_le_u64(data, offset))
 
 
+@always_inline
+def load_le_u32_words[
+    count: Int
+](data: Span[Byte, _], offset: Int) -> SIMD[DType.uint32, count]:
+    return bitcast[DType.uint32, count](
+        data.unsafe_ptr().unsafe_offset(offset).unsafe_load[width=count * 4]()
+    )
+
+
+@always_inline
+def load_le_u64_words[
+    count: Int
+](data: Span[Byte, _], offset: Int) -> SIMD[DType.uint64, count]:
+    return bitcast[DType.uint64, count](
+        data.unsafe_ptr().unsafe_offset(offset).unsafe_load[width=count * 8]()
+    )
+
+
+@always_inline
+def copy_to_buffer[
+    size: Int
+](
+    mut buffer: InlineArray[UInt8, size],
+    offset: Int,
+    data: Span[Byte, _],
+    start: Int,
+    count: Int,
+):
+    unsafe_memcpy(
+        dest=buffer.unsafe_ptr().unsafe_offset(offset),
+        src=data.unsafe_ptr().unsafe_offset(start),
+        count=count,
+    )
+
+
+@always_inline
 def write_le_u64[
     size: Int
 ](mut buffer: InlineArray[UInt8, size], offset: Int, value: UInt64):
-    for i in range(8):
-        buffer[offset + i] = ((value >> UInt64(i * 8)) & 0xFF).cast[
-            DType.uint8
-        ]()
+    buffer.unsafe_ptr().unsafe_offset(offset).unsafe_store(
+        bitcast[DType.uint8, 8](SIMD[DType.uint64, 1](value))
+    )
 
 
+@always_inline
 def write_be_u64[
     size: Int
 ](mut buffer: InlineArray[UInt8, size], offset: Int, value: UInt64):
-    for i in range(8):
-        buffer[offset + i] = ((value >> UInt64(56 - i * 8)) & 0xFF).cast[
-            DType.uint8
-        ]()
+    write_le_u64(buffer, offset, byte_swap(value))
 
 
 def append_le_u32(mut output: List[UInt8], value: UInt32):

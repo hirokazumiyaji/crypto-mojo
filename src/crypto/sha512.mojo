@@ -1,4 +1,4 @@
-from std.bit import rotate_bits_right
+from std.bit import byte_swap, rotate_bits_right
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
@@ -6,7 +6,8 @@ from ._common import (
     HashFunction,
     append_be_u64,
     bytes_to_hex,
-    read_be_u64,
+    copy_to_buffer,
+    load_le_u64_words,
     simd_lanes_be_u64,
     write_be_u64,
 )
@@ -96,6 +97,7 @@ comptime _K = [
 ]
 
 
+@always_inline
 def _big_sigma_zero(value: UInt64) -> UInt64:
     return (
         rotate_bits_right[28](value)
@@ -104,6 +106,7 @@ def _big_sigma_zero(value: UInt64) -> UInt64:
     )
 
 
+@always_inline
 def _big_sigma_one(value: UInt64) -> UInt64:
     return (
         rotate_bits_right[14](value)
@@ -112,6 +115,7 @@ def _big_sigma_one(value: UInt64) -> UInt64:
     )
 
 
+@always_inline
 def _small_sigma_zero(value: UInt64) -> UInt64:
     return (
         rotate_bits_right[1](value)
@@ -120,6 +124,7 @@ def _small_sigma_zero(value: UInt64) -> UInt64:
     )
 
 
+@always_inline
 def _small_sigma_one(value: UInt64) -> UInt64:
     return (
         rotate_bits_right[19](value)
@@ -128,14 +133,10 @@ def _small_sigma_one(value: UInt64) -> UInt64:
     )
 
 
-def _message_schedule(block: Span[Byte, _]) -> InlineArray[UInt64, 80]:
-    var words = InlineArray[UInt64, 80](uninitialized=True)
-    for i in range(16):
-        words[i] = read_be_u64(block, i * 8)
-    for i in range(16, 80):
-        var word = _small_sigma_one(words[i - 2]) + words[i - 7]
-        word += _small_sigma_zero(words[i - 15]) + words[i - 16]
-        words[i] = word
+@always_inline
+def _load_words(block: Span[Byte, _]) -> InlineArray[UInt64, 16]:
+    var words = InlineArray[UInt64, 16](uninitialized=True)
+    words.unsafe_ptr().unsafe_store(byte_swap(load_le_u64_words[16](block, 0)))
     return words^
 
 
@@ -153,10 +154,12 @@ struct _SHA512Core(Copyable, Movable):
         self._bit_length_high = 0
         self._bit_length_low = 0
 
+    @always_inline
     def _process_block(mut self, block: Span[Byte, _]):
-        self._process_words(_message_schedule(block))
+        self._process_words(_load_words(block))
 
-    def _process_words(mut self, words: InlineArray[UInt64, 80]):
+    @always_inline
+    def _process_words(mut self, var words: InlineArray[UInt64, 16]):
         var a = self._h[0]
         var b = self._h[1]
         var c = self._h[2]
@@ -165,11 +168,24 @@ struct _SHA512Core(Copyable, Movable):
         var f = self._h[5]
         var g = self._h[6]
         var h = self._h[7]
+        # The message schedule is a rolling 16-word window with compile-time
+        # indices, so it stays in registers.
         comptime for i in range(80):
+            comptime if i >= 16:
+                words[i % 16] = (
+                    _small_sigma_one(words[(i + 14) % 16])
+                    + words[(i + 9) % 16]
+                    + _small_sigma_zero(words[(i + 1) % 16])
+                    + words[i % 16]
+                )
             var choice = (e & f) ^ ((~e) & g)
             var majority = (a & b) ^ (a & c) ^ (b & c)
             var temp1 = (
-                h + _big_sigma_one(e) + choice + materialize[_K[i]]() + words[i]
+                h
+                + _big_sigma_one(e)
+                + choice
+                + materialize[_K[i]]()
+                + words[i % 16]
             )
             var temp2 = _big_sigma_zero(a) + majority
             h = g
@@ -191,8 +207,8 @@ struct _SHA512Core(Copyable, Movable):
         self._h[7] += h
 
     def _process_buffer(mut self):
-        var words = _message_schedule(Span(self._buffer))
-        self._process_words(words)
+        var words = _load_words(Span(self._buffer))
+        self._process_words(words^)
         self._buffer_len = 0
 
     def update_bytes(mut self, data: Span[Byte, _]):
@@ -209,8 +225,7 @@ struct _SHA512Core(Copyable, Movable):
         if self._buffer_len > 0:
             var needed = 128 - self._buffer_len
             var available = min(needed, len(data))
-            for i in range(available):
-                self._buffer[self._buffer_len + i] = data[i]
+            copy_to_buffer(self._buffer, self._buffer_len, data, 0, available)
             self._buffer_len += available
             offset = available
             if self._buffer_len == 128:
@@ -218,9 +233,9 @@ struct _SHA512Core(Copyable, Movable):
         while offset + 128 <= len(data):
             self._process_block(data[offset : offset + 128])
             offset += 128
-        for i in range(offset, len(data)):
-            self._buffer[self._buffer_len] = data[i]
-            self._buffer_len += 1
+        var remaining = len(data) - offset
+        copy_to_buffer(self._buffer, self._buffer_len, data, offset, remaining)
+        self._buffer_len += remaining
 
     def _update_with_simd(mut self, value: SIMD[_, _]):
         var bytes = simd_lanes_be_u64(value)

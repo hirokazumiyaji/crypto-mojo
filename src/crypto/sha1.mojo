@@ -1,4 +1,4 @@
-from std.bit import rotate_bits_left
+from std.bit import byte_swap, rotate_bits_left
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
@@ -6,20 +6,17 @@ from ._common import (
     HashFunction,
     append_be_u32,
     bytes_to_hex,
-    read_be_u32,
+    copy_to_buffer,
+    load_le_u32_words,
     simd_lanes_be_u64,
     write_be_u64,
 )
 
 
-def _message_schedule(block: Span[Byte, _]) -> InlineArray[UInt32, 80]:
-    var words = InlineArray[UInt32, 80](uninitialized=True)
-    for i in range(16):
-        words[i] = read_be_u32(block, i * 4)
-    for i in range(16, 80):
-        words[i] = rotate_bits_left[1](
-            words[i - 3] ^ words[i - 8] ^ words[i - 14] ^ words[i - 16]
-        )
+@always_inline
+def _load_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
+    var words = InlineArray[UInt32, 16](uninitialized=True)
+    words.unsafe_ptr().unsafe_store(byte_swap(load_le_u32_words[16](block, 0)))
     return words^
 
 
@@ -44,16 +41,27 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
         self._buffer_len = 0
         self._bit_length = 0
 
+    @always_inline
     def _process_block(mut self, block: Span[Byte, _]):
-        self._process_words(_message_schedule(block))
+        self._process_words(_load_words(block))
 
-    def _process_words(mut self, words: InlineArray[UInt32, 80]):
+    @always_inline
+    def _process_words(mut self, var words: InlineArray[UInt32, 16]):
         var a = self._h[0]
         var b = self._h[1]
         var c = self._h[2]
         var d = self._h[3]
         var e = self._h[4]
+        # The message schedule is a rolling 16-word window with compile-time
+        # indices, so it stays in registers.
         comptime for i in range(80):
+            comptime if i >= 16:
+                words[i % 16] = rotate_bits_left[1](
+                    words[(i + 13) % 16]
+                    ^ words[(i + 8) % 16]
+                    ^ words[(i + 2) % 16]
+                    ^ words[i % 16]
+                )
             var f: UInt32
             var k: UInt32
             if i < 20:
@@ -68,7 +76,7 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
             else:
                 f = b ^ c ^ d
                 k = 0xCA62C1D6
-            var temp = rotate_bits_left[5](a) + f + e + k + words[i]
+            var temp = rotate_bits_left[5](a) + f + e + k + words[i % 16]
             e = d
             d = c
             c = rotate_bits_left[30](b)
@@ -82,8 +90,8 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
         self._h[4] += e
 
     def _process_buffer(mut self):
-        var words = _message_schedule(Span(self._buffer))
-        self._process_words(words)
+        var words = _load_words(Span(self._buffer))
+        self._process_words(words^)
         self._buffer_len = 0
 
     def update_bytes(mut self, data: Span[Byte, _]):
@@ -92,8 +100,7 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
         if self._buffer_len > 0:
             var needed = 64 - self._buffer_len
             var available = min(needed, len(data))
-            for i in range(available):
-                self._buffer[self._buffer_len + i] = data[i]
+            copy_to_buffer(self._buffer, self._buffer_len, data, 0, available)
             self._buffer_len += available
             offset = available
             if self._buffer_len == 64:
@@ -101,9 +108,9 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
         while offset + 64 <= len(data):
             self._process_block(data[offset : offset + 64])
             offset += 64
-        for i in range(offset, len(data)):
-            self._buffer[self._buffer_len] = data[i]
-            self._buffer_len += 1
+        var remaining = len(data) - offset
+        copy_to_buffer(self._buffer, self._buffer_len, data, offset, remaining)
+        self._buffer_len += remaining
 
     def _update_with_bytes(mut self, data: Span[Byte, _]):
         self.update_bytes(data)
