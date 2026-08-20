@@ -7,8 +7,9 @@
 このマイルストーンでは、Pure Mojoの暗号ライブラリに必要なハッシュ、定数時間比較、メッセージ認証、鍵導出を実装する。
 Goの`crypto`パッケージ群を構成の参考にするが、公開APIにはMojoの型、所有権、エラー処理を用いる。
 
-ライブラリ本体はMojo標準ライブラリだけに依存する。
-FFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
+暗号プリミティブはMojo標準ライブラリだけに依存する。
+例外は`crypto.rand`だけで、OSのCSPRNGを呼び出してよい。
+ライブラリはFFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
 
 このマイルストーンは実験的リリースとして扱う。
 テストベクトルと独立実装による照合は行うが、外部のセキュリティ監査を受けた実装とは表明しない。
@@ -43,7 +44,8 @@ crypto
 ├── subtle
 ├── hmac
 ├── hkdf
-└── pbkdf2
+├── pbkdf2
+└── rand
 ```
 
 `crypto.md5`は`MD5`を公開する。
@@ -187,6 +189,17 @@ constant_time_compare(
 
 このマイルストーンで使わないselect、copy、整数比較は追加しない。
 
+### 乱数
+
+`crypto.rand`は次を公開する。
+
+```mojo
+fill(dest: Span[mut=True, Byte, _]) raises
+bytes(length: Int) raises -> List[UInt8]
+```
+
+`fill`は`/dev/urandom`を読み、短い読み取りを再試行しながら`dest`を完全に埋める。OSエントロピーの読み取りに失敗した場合のみraiseする。`bytes(n)`は`n` byteの乱数を返す。`n < 0`はraiseし、`n == 0`は空のリストを返す。`crypto.rand`はGoのような大域`Reader`traitオブジェクトを公開せず、ユーザー空間のDRBGも実装しない。
+
 ## データと所有権
 
 公開APIのバイト入力は借用した`Span[Byte, _]`で受け取る。
@@ -243,7 +256,7 @@ PBKDF2は0以下の反復回数、負の出力長、32-bitのブロック番号�
 ただし、コピーの回避を秘密値消去の保証として説明しない。
 
 Mojo標準の`std.random`は暗号学的に安全ではないため使用しない。
-暗号学的乱数生成はこのマイルストーンの範囲外とする。
+代わりに`crypto.rand`はOSのCSPRNG(LinuxとmacOSでは`/dev/urandom`)から直接読み取る。
 
 ## テスト
 
@@ -269,6 +282,8 @@ HKDF readerについては、`read`が同じ合計長の`expand`と一致する�
 
 PBKDF2-HMAC-SHA-2はRFC 7914のベクトルとGoの独立実装に照合した固定ベクトルで検証する。
 反復回数1、複数ブロック出力、長さ0、不正な反復回数を含める。
+
+`crypto.rand`は空の`fill`/`bytes(0)`、要求した長さが得られること、連続した出力が高確率で異なること、負の長さがraiseすることを検証する。OSエントロピーは非決定的なため、固定のkeystreamベクトルは用意しない。
 
 固定ベクトルはMojoテストへ埋め込む。
 テスト実行時にGo、Python、OpenSSLを呼び出さない。
@@ -299,7 +314,6 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 次の項目はこのマイルストーンに含めない。
 
 - ハッシュ、HMAC、HKDF readerの状態のserialize/deserialize
-- 暗号学的乱数生成
 - FIPS 140への準拠表明
 - SIMDまたはアセンブリによる最適化
 - ベンチマーク上の性能目標

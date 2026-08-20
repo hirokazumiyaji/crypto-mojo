@@ -2,7 +2,7 @@
 
 [English](README.md) | 日本語
 
-`crypto-mojo`は、Mojo標準ライブラリだけで実装した暗号プリミティブのパッケージです。
+`crypto-mojo`は、Mojo標準ライブラリだけで実装した暗号プリミティブのパッケージです。ただし`crypto.rand`だけは例外で、OSのCSPRNGから読み取ります。
 
 このリリースは実験段階であり、外部のセキュリティ監査を受けていません。
 本番のセキュリティ用途へ採用する場合は、利用側で実装と運用条件を評価してください。
@@ -99,6 +99,20 @@ var matches = constant_time_compare(
 `constant_time_compare()`は同じ長さの入力について全バイトの差を集約しますが、コンパイラとCPUを含む厳密な実行時間を保証しません。
 ライブラリは秘密値の確実なゼロ化も保証しません。
 現在のMojoでは、最適化後に消去処理が残ることを公開APIから保証できないためです。
+
+`crypto.rand`はOSのCSPRNG(`/dev/urandom`)からバイト列を読み取ります。Mojoの非暗号学的な`std.random`は使いません。
+
+```mojo
+from crypto.rand import bytes, fill
+
+var key = bytes(32)
+
+var nonce = List[UInt8](length=12, fill=0)
+fill(nonce[:])
+```
+
+`bytes(n)`は`n`が負の場合に例外を発生させ、`n == 0`の場合は空のリストを返します。
+`fill()`は与えられたバッファをOSからの短い読み取りを再試行しながら完全に埋め、OSエントロピーを全く読み取れない場合のみ例外を発生させます。
 
 ## ローカル開発
 

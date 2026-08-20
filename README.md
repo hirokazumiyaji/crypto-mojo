@@ -2,7 +2,7 @@
 
 English | [日本語](README.ja.md)
 
-`crypto-mojo` is a package of cryptographic primitives implemented with only the Mojo standard library.
+`crypto-mojo` is a package of cryptographic primitives implemented with only the Mojo standard library, with one exception: `crypto.rand` reads from the OS CSPRNG.
 
 This release is experimental and has not received an external security audit.
 Before adopting it for production security use, evaluate the implementation and your operational constraints yourself.
@@ -99,6 +99,20 @@ var matches = constant_time_compare(
 `constant_time_compare()` aggregates differences across all bytes for equal-length inputs, but it does not guarantee strict timing across the compiler and CPU.
 The library also does not guarantee reliable zeroization of secret values.
 Current Mojo cannot guarantee from the public API that wipe operations survive optimization.
+
+`crypto.rand` fills byte buffers from the OS CSPRNG (`/dev/urandom`), not Mojo's non-cryptographic `std.random`.
+
+```mojo
+from crypto.rand import bytes, fill
+
+var key = bytes(32)
+
+var nonce = List[UInt8](length=12, fill=0)
+fill(nonce[:])
+```
+
+`bytes(n)` raises if `n` is negative and returns an empty list for `n == 0`.
+`fill()` completely fills the given buffer, retrying on short OS reads, and raises only if it cannot read OS entropy at all.
 
 ## Local development
 

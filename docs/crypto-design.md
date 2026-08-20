@@ -7,8 +7,9 @@ English | [日本語](crypto-design.ja.md)
 This milestone implements the hashing, constant-time comparison, message authentication, and key derivation needed for a Pure Mojo cryptography library.
 Go's `crypto` packages inform the structure, but the public API uses Mojo types, ownership, and error handling.
 
-The library depends only on the Mojo standard library.
-It does not depend on FFI, Python, OpenSSL, or the existing `hash` package.
+Cryptographic primitives use only the Mojo standard library.
+`crypto.rand` is the one exception: it may call the OS CSPRNG.
+The library does not depend on FFI, Python, OpenSSL, or the existing `hash` package.
 
 Treat this milestone as an experimental release.
 We verify against test vectors and independent implementations, but we do not claim an externally audited implementation.
@@ -43,7 +44,8 @@ crypto
 ├── subtle
 ├── hmac
 ├── hkdf
-└── pbkdf2
+├── pbkdf2
+└── rand
 ```
 
 `crypto.md5` exports `MD5`.
@@ -187,6 +189,17 @@ constant_time_compare(
 
 Do not add select, copy, or integer comparison helpers unused in this milestone.
 
+### Random numbers
+
+`crypto.rand` exports:
+
+```mojo
+fill(dest: Span[mut=True, Byte, _]) raises
+bytes(length: Int) raises -> List[UInt8]
+```
+
+`fill` completely fills `dest` by reading `/dev/urandom`, retrying on short reads; it raises only on a hard failure to read OS entropy. `bytes(n)` returns `n` random bytes; `n < 0` raises, and `n == 0` returns an empty list. `crypto.rand` does not publish a Go-style global `Reader` trait object, and it does not implement a userspace DRBG.
+
 ## Data and ownership
 
 Public API byte inputs are borrowed `Span[Byte, _]`.
@@ -243,7 +256,7 @@ Implementations avoid unnecessary copies of secret values.
 Do not describe copy avoidance as a guarantee of secret zeroization.
 
 Do not use Mojo's standard `std.random`; it is not cryptographically secure.
-Cryptographic random number generation is out of scope for this milestone.
+`crypto.rand` reads directly from the OS CSPRNG (`/dev/urandom` on Linux and macOS) instead.
 
 ## Testing
 
@@ -269,6 +282,8 @@ For each public hash type and HMAC alias, verify that `update` → `clone` → f
 
 Verify PBKDF2-HMAC-SHA-2 against RFC 7914 vectors and fixed vectors checked against an independent Go implementation.
 Include one iteration, multi-block output, length 0, and invalid iteration counts.
+
+Verify `crypto.rand` with empty `fill` / `bytes(0)`, that requested lengths are honored, that successive outputs differ with high probability, and that a negative length raises. There are no fixed keystream vectors, since OS entropy is non-deterministic.
 
 Embed fixed vectors in the Mojo tests.
 Do not call Go, Python, or OpenSSL at test time.
@@ -299,7 +314,6 @@ It also states the boundaries for MD5 use, constant-time execution, secret zeroi
 This milestone does not include:
 
 - Serialize/deserialize of hash, HMAC, or HKDF reader state
-- Cryptographic random number generation
 - FIPS 140 compliance claims
 - SIMD or assembly optimization
 - Benchmark performance targets
