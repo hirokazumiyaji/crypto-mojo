@@ -1,14 +1,16 @@
 # crypto-mojo
 
-`crypto-mojo`は、Mojo標準ライブラリだけで実装した暗号プリミティブのパッケージです。
+English | [日本語](README.ja.md)
 
-このリリースは実験段階であり、外部のセキュリティ監査を受けていません。
-本番のセキュリティ用途へ採用する場合は、利用側で実装と運用条件を評価してください。
+`crypto-mojo` is a package of cryptographic primitives implemented with only the Mojo standard library.
 
-## 公開モジュール
+This release is experimental and has not received an external security audit.
+Before adopting it for production security use, evaluate the implementation and your operational constraints yourself.
 
-ハッシュ型はMojo標準の`std.hashlib.Hasher` traitに準拠します。
-`digest()`と`hexdigest()`は完全な暗号学的ダイジェストを返し、`finish()`は標準traitが要求する64-bit値を返します。
+## Public modules
+
+Hash types conform to Mojo's standard `std.hashlib.Hasher` trait.
+`digest()` and `hexdigest()` return the full cryptographic digest, while `finish()` returns the 64-bit value required by the standard trait.
 
 ```mojo
 from crypto.md5 import MD5
@@ -23,13 +25,13 @@ sha256.update_bytes("abc".as_bytes())
 print(sha256^.hexdigest())
 ```
 
-`BLAKE2b`の`digest_size`には1から64までのbyte数を指定できます。
-`BLAKE3`は32-byte鍵を受け取るkeyed hashと、`digest_xof()`および`hexdigest_xof()`による0以上の長さの可変長出力を提供します。
+`BLAKE2b` accepts a `digest_size` from 1 to 64 bytes.
+`BLAKE3` provides keyed hashing with a 32-byte key, plus variable-length output of length 0 or greater via `digest_xof()` and `hexdigest_xof()`.
 
-MD5は既存データや古い形式との互換性確認に限って使用してください。
-MD5は衝突耐性が必要な新しい設計、署名、証明書、パスワード保存には適しません。
+Use MD5 only to check compatibility with existing data or legacy formats.
+MD5 is not suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
 
-HMACはSHA-256、SHA-384、SHA-512のストリーミング型とワンショット関数を提供します。
+HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, and SHA-512.
 
 ```mojo
 from crypto.hmac import HMAC_SHA256, hmac_sha256
@@ -42,7 +44,7 @@ var tag = mac^.digest()
 var one_shot_tag = hmac_sha256(key, "message".as_bytes())
 ```
 
-HKDFとPBKDF2はSHA-256、SHA-384、SHA-512を選べる具象関数を公開します。
+HKDF and PBKDF2 expose concrete functions for SHA-256, SHA-384, and SHA-512.
 
 ```mojo
 from crypto.hkdf import derive_sha256 as hkdf_sha256
@@ -59,7 +61,7 @@ var password_key = pbkdf2_sha256(
 )
 ```
 
-同じ長さのバイト列を比較する場合は`crypto.subtle`を利用できます。
+To compare equal-length byte sequences, use `crypto.subtle`.
 
 ```mojo
 from crypto.subtle import constant_time_compare
@@ -69,13 +71,13 @@ var matches = constant_time_compare(
 )
 ```
 
-`constant_time_compare()`は同じ長さの入力について全バイトの差を集約しますが、コンパイラとCPUを含む厳密な実行時間を保証しません。
-ライブラリは秘密値の確実なゼロ化も保証しません。
-現在のMojoでは、最適化後に消去処理が残ることを公開APIから保証できないためです。
+`constant_time_compare()` aggregates differences across all bytes for equal-length inputs, but it does not guarantee strict timing across the compiler and CPU.
+The library also does not guarantee reliable zeroization of secret values.
+Current Mojo cannot guarantee from the public API that wipe operations survive optimization.
 
-## ローカル開発
+## Local development
 
-PixiはMojo 1.0系と`osx-arm64`および`linux-64`のlockfileを管理します。
+Pixi manages Mojo 1.0 and lockfiles for `osx-arm64` and `linux-64`.
 
 ```bash
 pixi install --locked
@@ -84,10 +86,10 @@ pixi run test
 pixi run test-consumer
 ```
 
-個別のテストには`pixi run test-sha256`のようなタスクを利用できます。
-`test-consumer`は`crypto.mojoc`を`/tmp`へprecompileし、`src`をimport pathへ加えずに配布後のimportを検証します。
+Use tasks such as `pixi run test-sha256` for individual tests.
+`test-consumer` precompiles `crypto.mojoc` into `/tmp` and verifies post-distribution imports without adding `src` to the import path.
 
-ローカルで任意のMojoプログラムからprecompile済みパッケージを使う場合は、次のように実行します。
+To use the precompiled package from an arbitrary local Mojo program:
 
 ```bash
 mkdir -p /tmp/crypto-mojo/lib/mojo
@@ -95,9 +97,9 @@ pixi run mojo precompile src/crypto -o /tmp/crypto-mojo/lib/mojo/crypto.mojoc
 pixi run mojo run -I /tmp/crypto-mojo/lib/mojo your_program.mojo
 ```
 
-## condaパッケージ
+## conda package
 
-recipeは`crypto.mojoc`を`${PREFIX}/lib/mojo`へインストールします。
+The recipe installs `crypto.mojoc` into `${PREFIX}/lib/mojo`.
 
 ```bash
 pixi global install rattler-build
@@ -107,8 +109,8 @@ rattler-build build \
   -c https://conda.modular.com/max
 ```
 
-GitHub Actionsのpublish workflowは`v*.*.*`形式のtagと手動実行だけを受け付け、Linux x86-64とmacOS arm64のpackageを作成します。
-tagから公開する場合は、tagのversionとrecipeの`context.version`を一致させます。
+The GitHub Actions publish workflow accepts only `v*.*.*` tags and manual runs, and builds packages for Linux x86-64 and macOS arm64.
+When publishing from a tag, keep the tag version aligned with `context.version` in the recipe.
 
-公開前にrepository variable `PREFIX_CHANNEL`とrepository secret `PREFIX_API_KEY`を設定してください。
-workflowはAPI keyをコマンド引数へ渡さず、ログにも出力しません。
+Before publishing, set the repository variable `PREFIX_CHANNEL` and the repository secret `PREFIX_API_KEY`.
+The workflow does not pass the API key as a command argument and does not print it in logs.
