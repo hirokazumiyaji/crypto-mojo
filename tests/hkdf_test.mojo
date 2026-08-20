@@ -1,5 +1,6 @@
 from crypto._common import bytes_to_hex
 from crypto.hkdf import (
+    HKDF_SHA256,
     derive_sha256,
     derive_sha384,
     derive_sha512,
@@ -9,6 +10,7 @@ from crypto.hkdf import (
     extract_sha256,
     extract_sha384,
     extract_sha512,
+    reader_sha256,
 )
 from std.collections import List
 from std.testing import TestSuite, assert_equal, assert_raises
@@ -122,6 +124,55 @@ def test_hkdf_sha256_output_length_boundaries() raises:
         _ = expand_sha256(key, info, 8161)
     with assert_raises():
         _ = expand_sha256(key, info, -1)
+
+
+def test_hkdf_reader_matches_expand() raises:
+    var prk = extract_sha256(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var reader = reader_sha256(prk[:], info[:])
+    assert_equal(reader.read(42), expand_sha256(prk[:], info[:], 42))
+
+
+def test_hkdf_reader_sequential_reads() raises:
+    var prk = extract_sha256(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var full = expand_sha256(prk[:], info[:], 42)
+    var reader = HKDF_SHA256(prk[:], info[:])
+    var first = reader.read(10)
+    var second = reader.read(32)
+    var joined = first.copy()
+    for b in second:
+        joined.append(b)
+    assert_equal(joined, full)
+
+
+def test_hkdf_reader_reset_and_clone() raises:
+    var prk = extract_sha256(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = _ascending_bytes(0xF0, 10)
+    var reader = HKDF_SHA256(prk[:], info[:])
+    var a = reader.read(8)
+    var cloned = reader.clone()
+    var b1 = reader.read(8)
+    var b2 = cloned.read(8)
+    assert_equal(b1, b2)
+    reader.reset()
+    assert_equal(reader.read(8), a)
+
+
+def test_hkdf_reader_rejects_over_max() raises:
+    var prk = extract_sha256(
+        _ascending_bytes(0x00, 13)[:], _repeated_byte(0x0B, 22)[:]
+    )
+    var info = List[UInt8]()
+    var reader = HKDF_SHA256(prk[:], info[:])
+    with assert_raises():
+        _ = reader.read(255 * 32 + 1)
 
 
 def main() raises:

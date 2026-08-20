@@ -136,7 +136,20 @@ derive_sha256(
 ```
 
 初期リリースは要求された長さを一度に返す。
-段階的に読み出すreader型は含めない。
+
+`crypto.hkdf`は各SHA-2方式に対して、`extract`を再実行せずにPRKとinfoから構築する段階的なreaderも公開する。
+
+```mojo
+struct HKDF_SHA256:
+    def __init__(out self, prk: Span[Byte, _], info: Span[Byte, _])
+    def read(mut self, length: Int) raises -> List[UInt8]
+    def clone(self) -> Self
+    def reset(mut self)
+
+reader_sha256(prk: Span[Byte, _], info: Span[Byte, _]) -> HKDF_SHA256
+```
+
+`read(n)`はExpand出力の次の`n` byteを返す。内部のブロック生成はワンショットの`expand`と完全に一致する（前のブロック || info || counter）。`n`が負の場合、または累積で読み出したbyte数が`255 * digest_size`を超える場合は例外を発生させる。`reset`は同じPRK/infoについて展開カーソルを先頭へ巻き戻す。`clone`はカーソルの独立した複製を作る。SHA-384版とSHA-512版のreader（`HKDF_SHA384`/`reader_sha384`、`HKDF_SHA512`/`reader_sha512`）も同じ形になる。
 
 ### PBKDF2
 
@@ -243,6 +256,8 @@ HKDF-SHA-256はRFC 5869のテストベクトルで検証する。
 SHA-384版とSHA-512版はGoの独立実装と事前に照合した固定ベクトルで検証する。
 長さ0、最大長、最大長超過も検証する。
 
+HKDF readerについては、`read`が同じ合計長の`expand`と一致すること、ブロック境界をまたぐ複数回の`read`を連結した結果が単一の`expand`呼び出しと一致すること、`clone`が元のreaderと独立に分岐すること、`reset`が元の実行と同じbyte列を再生すること、最大長を超える読み出しが例外を発生させることを検証する。
+
 PBKDF2-HMAC-SHA-2はRFC 7914のベクトルとGoの独立実装に照合した固定ベクトルで検証する。
 反復回数1、複数ブロック出力、長さ0、不正な反復回数を含める。
 
@@ -274,7 +289,6 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 
 次の項目はこのマイルストーンに含めない。
 
-- HKDFのreader API
 - 状態のreset、clone、serialize
 - 暗号学的乱数生成
 - FIPS 140への準拠表明

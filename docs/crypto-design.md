@@ -136,7 +136,20 @@ derive_sha256(
 ```
 
 The initial release returns the requested length in one shot.
-Do not include a reader type for incremental output.
+
+`crypto.hkdf` also exports an incremental reader for each SHA-2 variant, built from a PRK and info without re-running `extract`.
+
+```mojo
+struct HKDF_SHA256:
+    def __init__(out self, prk: Span[Byte, _], info: Span[Byte, _])
+    def read(mut self, length: Int) raises -> List[UInt8]
+    def clone(self) -> Self
+    def reset(mut self)
+
+reader_sha256(prk: Span[Byte, _], info: Span[Byte, _]) -> HKDF_SHA256
+```
+
+`read(n)` returns the next `n` bytes of Expand output; internal block generation matches the one-shot `expand` function exactly (previous block || info || counter). It raises for negative `n` or when cumulative bytes read would exceed `255 * digest_size`. `reset` rewinds the expansion cursor to the start for the same PRK/info. `clone` forks an independent copy of the cursor. SHA-384 and SHA-512 readers (`HKDF_SHA384` / `reader_sha384`, `HKDF_SHA512` / `reader_sha512`) follow the same shape.
 
 ### PBKDF2
 
@@ -243,6 +256,8 @@ Verify HKDF-SHA-256 against RFC 5869 test vectors.
 Verify SHA-384 and SHA-512 with fixed vectors previously checked against an independent Go implementation.
 Also cover length 0, maximum length, and over-maximum length.
 
+Verify that the HKDF reader's `read` matches `expand` for an equal total length, that sequential reads across block boundaries concatenate to the same bytes as a single `expand` call, that `clone` diverges independently from the original reader, that `reset` replays the same bytes as the original run, and that reading past the maximum length raises.
+
 Verify PBKDF2-HMAC-SHA-2 against RFC 7914 vectors and fixed vectors checked against an independent Go implementation.
 Include one iteration, multi-block output, length 0, and invalid iteration counts.
 
@@ -274,7 +289,6 @@ It also states the boundaries for MD5 use, constant-time execution, secret zeroi
 
 This milestone does not include:
 
-- An HKDF reader API
 - State reset, clone, or serialize
 - Cryptographic random number generation
 - FIPS 140 compliance claims

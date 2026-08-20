@@ -65,6 +65,21 @@ var password_key = pbkdf2_sha256(
 )
 ```
 
+HKDF also exposes an incremental reader for SHA-256, SHA-384, and SHA-512 (`HKDF_SHA256` / `reader_sha256`, and the `384`/`512` equivalents) for callers that need Expand output split across multiple calls instead of one length up front.
+
+```mojo
+from crypto.hkdf import extract_sha256, reader_sha256
+
+var prk = extract_sha256("salt".as_bytes(), "input key material".as_bytes())
+var reader = reader_sha256(prk[:], "context".as_bytes())
+var first_half = reader.read(16)
+var second_half = reader.read(16)
+```
+
+`read(n)` raises if `n` is negative or if the cumulative bytes read would exceed `255 * digest_size`.
+`reset()` rewinds the reader to the start of Expand for the same PRK/info without re-running `extract`.
+`clone()` forks an independent copy of the current expansion cursor.
+
 To compare equal-length byte sequences, use `crypto.subtle`.
 
 ```mojo

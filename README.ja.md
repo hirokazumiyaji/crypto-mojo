@@ -65,6 +65,21 @@ var password_key = pbkdf2_sha256(
 )
 ```
 
+HKDFはSHA-256、SHA-384、SHA-512向けに段階的なreader（`HKDF_SHA256`/`reader_sha256`、および`384`/`512`版）も提供します。Expandの出力を一度に指定せず、複数回に分けて読み出したい場合に使います。
+
+```mojo
+from crypto.hkdf import extract_sha256, reader_sha256
+
+var prk = extract_sha256("salt".as_bytes(), "input key material".as_bytes())
+var reader = reader_sha256(prk[:], "context".as_bytes())
+var first_half = reader.read(16)
+var second_half = reader.read(16)
+```
+
+`read(n)`は`n`が負の場合、または累積で読み出したbyte数が`255 * digest_size`を超える場合に例外を発生させます。
+`reset()`は同じPRK/infoに対して`extract`を再実行せずにExpandの先頭へ巻き戻します。
+`clone()`は現在の展開カーソルを独立した状態として複製します。
+
 同じ長さのバイト列を比較する場合は`crypto.subtle`を利用できます。
 
 ```mojo
