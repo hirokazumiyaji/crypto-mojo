@@ -153,7 +153,7 @@ def _block_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
     return words^
 
 
-struct MD5(Defaultable, Hasher):
+struct MD5(Copyable, Defaultable, Hasher, Movable):
     var _state: InlineArray[UInt32, 4]
     var _buffer: InlineArray[UInt8, 64]
     var _buffer_len: Int
@@ -232,6 +232,15 @@ struct MD5(Defaultable, Hasher):
 
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
+
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._state = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476]
+        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer_len = 0
+        self._bit_length = 0
 
     def _finalize(mut self):
         var original_length = self._bit_length

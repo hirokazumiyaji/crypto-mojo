@@ -7,8 +7,9 @@
 このマイルストーンでは、Pure Mojoの暗号ライブラリに必要なハッシュ、定数時間比較、メッセージ認証、鍵導出を実装する。
 Goの`crypto`パッケージ群を構成の参考にするが、公開APIにはMojoの型、所有権、エラー処理を用いる。
 
-ライブラリ本体はMojo標準ライブラリだけに依存する。
-FFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
+暗号プリミティブはMojo標準ライブラリだけに依存する。
+例外は`crypto.rand`だけで、OSのCSPRNGを呼び出してよい。
+ライブラリはFFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
 
 このマイルストーンは実験的リリースとして扱う。
 テストベクトルと独立実装による照合は行うが、外部のセキュリティ監査を受けた実装とは表明しない。
@@ -34,6 +35,7 @@ FFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
 ```text
 crypto
 ├── md5
+├── sha1
 ├── sha256
 ├── sha512
 ├── sha3
@@ -42,11 +44,13 @@ crypto
 ├── subtle
 ├── hmac
 ├── hkdf
-└── pbkdf2
+├── pbkdf2
+└── rand
 ```
 
 `crypto.md5`は`MD5`を公開する。
-`crypto.sha256`は`SHA256`を公開する。
+`crypto.sha1`は`SHA1`を公開する。
+`crypto.sha256`は`SHA224`と`SHA256`を公開する。
 `crypto.sha512`は`SHA384`と`SHA512`を公開する。
 `crypto.sha3`は`SHA3_256`を公開する。
 `crypto.blake2b`は`BLAKE2b`を公開する。
@@ -60,20 +64,30 @@ crypto
 各ハッシュ型はMojo標準の`std.hashlib.Hasher` traitに準拠し続ける。
 `crypto.__init__`はサブモジュールの型や関数を一括で再公開しない。
 
-HMAC、HKDF、PBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
-MD5は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
+公開ハッシュ型はすべて`clone(self) -> Self`と`reset(mut self)`を提供する。
+`clone`は現在の中間状態を独立に複製したものを返す。
+`reset`はその値の`__init__`直後の状態へ戻す。unkeyedなハッシュは空の状態へ戻り、`BLAKE2b`は設定済みの`digest_size`を維持し、keyedな`BLAKE3`は鍵を維持する(内部に保持済みの鍵ワードから再構築するため、呼び出し側が鍵を再指定する必要はない)。`digest`、`hexdigest`、`finish`は引き続き値を消費し、消費後の値に`reset`は使えない。
+
+HMACは汎用の`HMAC[H: HashFunction]`に加えて、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3を正式にサポートする。
+HKDFとPBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
+MD5とSHA-1は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
 
 ## 公開API
 
 ### HMAC
 
-`crypto.hmac`は次の具象型を公開する。
+`crypto.hmac`は汎用の`HMAC[H: HashFunction]`から構築した次の具象型を公開する。
 
 ```mojo
 HMAC_SHA256(key: Span[Byte, _])
 HMAC_SHA384(key: Span[Byte, _])
 HMAC_SHA512(key: Span[Byte, _])
+HMAC_SHA3_256(key: Span[Byte, _])
+HMAC_BLAKE2b(key: Span[Byte, _])
+HMAC_BLAKE3(key: Span[Byte, _])
 ```
+
+`SHA3_256`、`BLAKE2b`、`BLAKE3`は固定の`block_size`/`digest_size`で`crypto._common.HashFunction`に準拠し、`HMAC[H]`が型チェックを通るようにする。`SHA3_256`は136/32、`BLAKE2b`は128/64(`Defaultable`によるデフォルト構築で出力を64 byteに固定する。可変長出力用の`BLAKE2b(digest_size=…)`はHMACの経路には使わない)、`BLAKE3`は64/32(unkeyedのデフォルト構築を使う。BLAKE3のkeyed hashモードはHMACに統合しない別機能のままとする)。
 
 各型は次の操作を持つ。
 
@@ -82,10 +96,13 @@ update_bytes(mut self, data: Span[Byte, _])
 digest(var self) -> List[UInt8]
 hexdigest(var self) -> String
 verify(var self, expected: Span[Byte, _]) -> Bool
+clone(self) -> Self
+reset(mut self)
 ```
 
 `digest`、`hexdigest`、`verify`はHMACの状態を消費する。
-状態の`reset`とコピーは公開しない。
+`clone`は現在のストリーミング状態を独立に複製したものを返す。
+`reset`は`__init__`終了時点で取得したinner/outerのハッシュ状態へ復元するため、生の鍵を保持したり再導出したりせずに同じ鍵で新しいメッセージを開始できる。`digest`/`hexdigest`/`verify`で値を消費した後は`reset`を使えない。
 
 短い入力向けに次のワンショット関数を公開する。
 
@@ -93,6 +110,9 @@ verify(var self, expected: Span[Byte, _]) -> Bool
 hmac_sha256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha384(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha512(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_sha3_256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_blake2b(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
+hmac_blake3(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 ```
 
 HMAC型は標準`Hasher` traitに準拠しない。
@@ -125,7 +145,20 @@ derive_sha256(
 ```
 
 初期リリースは要求された長さを一度に返す。
-段階的に読み出すreader型は含めない。
+
+`crypto.hkdf`は各SHA-2方式に対して、`extract`を再実行せずにPRKとinfoから構築する段階的なreaderも公開する。
+
+```mojo
+struct HKDF_SHA256:
+    def __init__(out self, prk: Span[Byte, _], info: Span[Byte, _])
+    def read(mut self, length: Int) raises -> List[UInt8]
+    def clone(self) -> Self
+    def reset(mut self)
+
+reader_sha256(prk: Span[Byte, _], info: Span[Byte, _]) -> HKDF_SHA256
+```
+
+`read(n)`はExpand出力の次の`n` byteを返す。内部のブロック生成はワンショットの`expand`と完全に一致する（前のブロック || info || counter）。`n`が負の場合、または累積で読み出したbyte数が`255 * digest_size`を超える場合は例外を発生させる。`reset`は同じPRK/infoについて展開カーソルを先頭へ巻き戻す。`clone`はカーソルの独立した複製を作る。SHA-384版とSHA-512版のreader（`HKDF_SHA384`/`reader_sha384`、`HKDF_SHA512`/`reader_sha512`）も同じ形になる。
 
 ### PBKDF2
 
@@ -155,6 +188,17 @@ constant_time_compare(
 ```
 
 このマイルストーンで使わないselect、copy、整数比較は追加しない。
+
+### 乱数
+
+`crypto.rand`は次を公開する。
+
+```mojo
+fill(dest: Span[mut=True, Byte, _]) raises
+bytes(length: Int) raises -> List[UInt8]
+```
+
+`fill`は`/dev/urandom`を読み、短い読み取りを再試行しながら`dest`を完全に埋める。OSエントロピーの読み取りに失敗した場合のみraiseする。`bytes(n)`は`n` byteの乱数を返す。`n < 0`はraiseし、`n == 0`は空のリストを返す。`crypto.rand`はGoのような大域`Reader`traitオブジェクトを公開せず、ユーザー空間のDRBGも実装しない。
 
 ## データと所有権
 
@@ -212,23 +256,34 @@ PBKDF2は0以下の反復回数、負の出力長、32-bitのブロック番号�
 ただし、コピーの回避を秘密値消去の保証として説明しない。
 
 Mojo標準の`std.random`は暗号学的に安全ではないため使用しない。
-暗号学的乱数生成はこのマイルストーンの範囲外とする。
+代わりに`crypto.rand`はOSのCSPRNG(LinuxとmacOSでは`/dev/urandom`)から直接読み取る。
 
 ## テスト
 
 ハッシュには既存の`hash-mojo`テストを移植する。
-対象はMD5、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3である。
+対象はMD5、SHA-1、SHA-224、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3である。
+SHA-1とSHA-224は既知の固定ベクトルで検証する。空入力、短いASCII入力、複数回の`update_bytes`と一括入力の一致を含める。
 
 HMACはRFC 4231のSHA-256、SHA-384、SHA-512テストベクトルで検証する。
 一つの入力を一度に渡した結果と複数回の`update_bytes`で渡した結果が一致することも検証する。
 空入力、ブロック長より長い鍵、MACの一致、不一致、長さ違いを含める。
 
+HMAC-SHA3-256は公開されているテストベクトルで検証する。
+HMAC-BLAKE2bとHMAC-BLAKE3は独立実装との事前照合を経て埋め込んだ固定ベクトルで検証する。
+複数回の`update_bytes`によるストリーミングがワンショット関数の結果と一致することも検証する。
+
 HKDF-SHA-256はRFC 5869のテストベクトルで検証する。
 SHA-384版とSHA-512版はGoの独立実装と事前に照合した固定ベクトルで検証する。
 長さ0、最大長、最大長超過も検証する。
 
+HKDF readerについては、`read`が同じ合計長の`expand`と一致すること、ブロック境界をまたぐ複数回の`read`を連結した結果が単一の`expand`呼び出しと一致すること、`clone`が元のreaderと独立に分岐すること、`reset`が元の実行と同じbyte列を再生すること、最大長を超える読み出しが例外を発生させることを検証する。
+
+公開ハッシュ型とHMACの各エイリアスについて、`update` → `clone` → 片方だけ追加更新すると異なるダイジェストになること、`update` → `reset` → 同じ入力を再投入すると新規に構築したハッシャーやHMACと一致することを検証する。HMACでは特に、鍵を再指定せずに`reset`後に投入したMACが同じ鍵とメッセージのワンショット関数と一致すること(鍵情報が保持されること)を検証する。
+
 PBKDF2-HMAC-SHA-2はRFC 7914のベクトルとGoの独立実装に照合した固定ベクトルで検証する。
 反復回数1、複数ブロック出力、長さ0、不正な反復回数を含める。
+
+`crypto.rand`は空の`fill`/`bytes(0)`、要求した長さが得られること、連続した出力が高確率で異なること、負の長さがraiseすることを検証する。OSエントロピーは非決定的なため、固定のkeystreamベクトルは用意しない。
 
 固定ベクトルはMojoテストへ埋め込む。
 テスト実行時にGo、Python、OpenSSLを呼び出さない。
@@ -258,14 +313,10 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 
 次の項目はこのマイルストーンに含めない。
 
-- SHA-224とSHA-1
-- HMAC-SHA3とHMAC-BLAKE
-- HKDFのreader API
-- 状態のreset、clone、serialize
-- 暗号学的乱数生成
+- ハッシュ、HMAC、HKDF readerの状態のserialize/deserialize
 - FIPS 140への準拠表明
 - SIMDまたはアセンブリによる最適化
-- ベンチマーク上の性能目標
+- ベンチマーク上の性能目標（計測用にローカルの`pixi run bench`はあるが、CIは数値の合否を見ない）
 - prefix.dev上の既存`hash`パッケージの削除操作
 
 既存`hash`パッケージの削除は、`crypto`パッケージのテスト、precompile、配布確認が完了した後に別作業として行う。

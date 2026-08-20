@@ -2,7 +2,7 @@
 
 English | [日本語](README.ja.md)
 
-`crypto-mojo` is a package of cryptographic primitives implemented with only the Mojo standard library.
+`crypto-mojo` is a package of cryptographic primitives implemented with only the Mojo standard library, with one exception: `crypto.rand` reads from the OS CSPRNG.
 
 This release is experimental and has not received an external security audit.
 Before adopting it for production security use, evaluate the implementation and your operational constraints yourself.
@@ -14,7 +14,8 @@ Hash types conform to Mojo's standard `std.hashlib.Hasher` trait.
 
 ```mojo
 from crypto.md5 import MD5
-from crypto.sha256 import SHA256
+from crypto.sha1 import SHA1
+from crypto.sha256 import SHA224, SHA256
 from crypto.sha512 import SHA384, SHA512
 from crypto.sha3 import SHA3_256
 from crypto.blake2b import BLAKE2b
@@ -28,10 +29,13 @@ print(sha256^.hexdigest())
 `BLAKE2b` accepts a `digest_size` from 1 to 64 bytes.
 `BLAKE3` provides keyed hashing with a 32-byte key, plus variable-length output of length 0 or greater via `digest_xof()` and `hexdigest_xof()`.
 
-Use MD5 only to check compatibility with existing data or legacy formats.
-MD5 is not suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
+Use MD5 and SHA-1 only to check compatibility with existing data or legacy formats.
+Neither is suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
 
-HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, and SHA-512.
+Every hash type also provides `clone()` and `reset()`.
+`clone()` returns an independent copy of the current state; `reset()` returns the instance to its post-construction state (preserving `BLAKE2b`'s `digest_size` and `BLAKE3`'s key, if any). `digest()`, `hexdigest()`, and `finish()` remain consuming, so call `clone()` first if you need both a digest and a continued stream.
+
+HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3.
 
 ```mojo
 from crypto.hmac import HMAC_SHA256, hmac_sha256
@@ -43,6 +47,12 @@ var tag = mac^.digest()
 
 var one_shot_tag = hmac_sha256(key, "message".as_bytes())
 ```
+
+`HMAC_SHA3_256` / `hmac_sha3_256`, `HMAC_BLAKE2b` / `hmac_blake2b`, and `HMAC_BLAKE3` / `hmac_blake3` follow the same shape.
+`HMAC_BLAKE2b` fixes the digest size at 64 bytes; `HMAC_BLAKE3` uses BLAKE3's default unkeyed mode with a 32-byte digest, distinct from BLAKE3's own keyed-hash feature.
+
+Every HMAC type also provides `clone()` and `reset()`.
+`reset()` restores the keyed inner/outer state captured when the HMAC was constructed, so you can authenticate a new message with the same key without storing or re-deriving the raw key. `digest()`, `hexdigest()`, and `verify()` still consume the value; `reset()` is unavailable afterward.
 
 HKDF and PBKDF2 expose concrete functions for SHA-256, SHA-384, and SHA-512.
 
@@ -61,6 +71,21 @@ var password_key = pbkdf2_sha256(
 )
 ```
 
+HKDF also exposes an incremental reader for SHA-256, SHA-384, and SHA-512 (`HKDF_SHA256` / `reader_sha256`, and the `384`/`512` equivalents) for callers that need Expand output split across multiple calls instead of one length up front.
+
+```mojo
+from crypto.hkdf import extract_sha256, reader_sha256
+
+var prk = extract_sha256("salt".as_bytes(), "input key material".as_bytes())
+var reader = reader_sha256(prk[:], "context".as_bytes())
+var first_half = reader.read(16)
+var second_half = reader.read(16)
+```
+
+`read(n)` raises if `n` is negative or if the cumulative bytes read would exceed `255 * digest_size`.
+`reset()` rewinds the reader to the start of Expand for the same PRK/info without re-running `extract`.
+`clone()` forks an independent copy of the current expansion cursor.
+
 To compare equal-length byte sequences, use `crypto.subtle`.
 
 ```mojo
@@ -75,6 +100,20 @@ var matches = constant_time_compare(
 The library also does not guarantee reliable zeroization of secret values.
 Current Mojo cannot guarantee from the public API that wipe operations survive optimization.
 
+`crypto.rand` fills byte buffers from the OS CSPRNG (`/dev/urandom`), not Mojo's non-cryptographic `std.random`.
+
+```mojo
+from crypto.rand import bytes, fill
+
+var key = bytes(32)
+
+var nonce = List[UInt8](length=12, fill=0)
+fill(nonce[:])
+```
+
+`bytes(n)` raises if `n` is negative and returns an empty list for `n == 0`.
+`fill()` completely fills the given buffer, retrying on short OS reads, and raises only if it cannot read OS entropy at all.
+
 ## Local development
 
 Pixi manages Mojo 1.0 and lockfiles for `osx-arm64` and `linux-64`.
@@ -84,10 +123,14 @@ pixi install --locked
 pixi run format
 pixi run test
 pixi run test-consumer
+pixi run bench
 ```
 
 Use tasks such as `pixi run test-sha256` for individual tests.
 `test-consumer` precompiles `crypto.mojoc` into `/tmp` and verifies post-distribution imports without adding `src` to the import path.
+
+`pixi run bench` runs microbenchmarks under `benchmarks/` via Mojo's `std.benchmark` and prints throughput (for example GB/s for hashing).
+It is a measurement harness only — CI does not enforce performance targets.
 
 To use the precompiled package from an arbitrary local Mojo program:
 

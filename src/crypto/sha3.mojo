@@ -3,6 +3,7 @@ from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
 from ._common import (
+    HashFunction,
     append_le_u64,
     bytes_to_hex,
     read_le_u64,
@@ -54,7 +55,10 @@ def _block_lanes(block: Span[Byte, _]) -> InlineArray[UInt64, 17]:
     return lanes^
 
 
-struct SHA3_256(Defaultable, Hasher):
+struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
+    comptime block_size = 136
+    comptime digest_size = 32
+
     var _state: InlineArray[UInt64, 25]
     var _buffer: InlineArray[UInt8, 136]
     var _buffer_len: Int
@@ -131,6 +135,14 @@ struct SHA3_256(Defaultable, Hasher):
 
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
+
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._state = InlineArray[UInt64, 25](fill=0)
+        self._buffer = InlineArray[UInt8, 136](fill=0)
+        self._buffer_len = 0
 
     def _finalize(mut self):
         self._buffer[self._buffer_len] = 0x06

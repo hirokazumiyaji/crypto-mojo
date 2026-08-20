@@ -1,4 +1,4 @@
-from crypto.sha256 import SHA256
+from crypto.sha256 import SHA224, SHA256
 from std.collections import List
 from std.testing import TestSuite, assert_equal
 
@@ -168,6 +168,43 @@ def test_sha256_standard_hasher_finish() raises:
     hasher.update(UInt32(42))
     var value = hasher^.finish()
     assert_equal(value, 12014217582344364938)
+
+
+def test_sha224_empty() raises:
+    var hasher = SHA224()
+    assert_equal(
+        hasher^.hexdigest(),
+        "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f",
+    )
+
+
+def test_sha224_abc() raises:
+    var hasher = SHA224()
+    hasher.update_bytes("abc".as_bytes())
+    assert_equal(
+        hasher^.hexdigest(),
+        "23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7",
+    )
+
+
+def test_sha224_split_update_matches_one_shot() raises:
+    var input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
+    var bytes = input.as_bytes()
+    var expected = "c97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3"
+
+    var one_shot = SHA224()
+    one_shot.update_bytes(bytes)
+    assert_equal(one_shot^.hexdigest(), expected)
+
+    var split = SHA224()
+    var start = 0
+    var width = 1
+    while start < len(bytes):
+        var end = min(start + width, len(bytes))
+        split.update_bytes(bytes[start:end])
+        start = end
+        width = (width % 13) + 1
+    assert_equal(split^.hexdigest(), expected)
 
 
 def main() raises:
