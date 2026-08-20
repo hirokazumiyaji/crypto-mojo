@@ -187,5 +187,25 @@ def test_sha224_abc() raises:
     )
 
 
+def test_sha224_split_update_matches_one_shot() raises:
+    var input = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
+    var bytes = input.as_bytes()
+    var expected = "c97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3"
+
+    var one_shot = SHA224()
+    one_shot.update_bytes(bytes)
+    assert_equal(one_shot^.hexdigest(), expected)
+
+    var split = SHA224()
+    var start = 0
+    var width = 1
+    while start < len(bytes):
+        var end = min(start + width, len(bytes))
+        split.update_bytes(bytes[start:end])
+        start = end
+        width = (width % 13) + 1
+    assert_equal(split^.hexdigest(), expected)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
