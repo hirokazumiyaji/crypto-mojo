@@ -23,8 +23,8 @@ sha256.update_bytes("abc".as_bytes())
 print(sha256^.hexdigest())
 ```
 
-`BLAKE2b`は`digest_size`を指定できます。
-`BLAKE3`は32-byte鍵を受け取るkeyed hashと、`digest_xof()`および`hexdigest_xof()`による可変長出力を提供します。
+`BLAKE2b`の`digest_size`には1から64までのbyte数を指定できます。
+`BLAKE3`は32-byte鍵を受け取るkeyed hashと、`digest_xof()`および`hexdigest_xof()`による0以上の長さの可変長出力を提供します。
 
 MD5は既存データや古い形式との互換性確認に限って使用してください。
 MD5は衝突耐性が必要な新しい設計、署名、証明書、パスワード保存には適しません。

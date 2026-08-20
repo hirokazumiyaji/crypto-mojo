@@ -537,7 +537,9 @@ struct BLAKE3(Defaultable, Hasher):
     def __init__(out self):
         self._core = _BLAKE3Core(_initial_key_words(), 0)
 
-    def __init__(out self, key: Span[Byte, _]):
+    def __init__(out self, key: Span[Byte, _]) raises:
+        if len(key) != 32:
+            raise Error("BLAKE3 key must be exactly 32 bytes")
         self._core = _BLAKE3Core(_key_words(key), _KEYED_HASH)
 
     def update_bytes(mut self, data: Span[Byte, _]):
@@ -558,10 +560,14 @@ struct BLAKE3(Defaultable, Hasher):
     def hexdigest(var self) -> String:
         return self._core.hexdigest()
 
-    def digest_xof(var self, length: Int) -> List[UInt8]:
+    def digest_xof(var self, length: Int) raises -> List[UInt8]:
+        if length < 0:
+            raise Error("BLAKE3 XOF length must not be negative")
         return self._core.digest_xof(length)
 
-    def hexdigest_xof(var self, length: Int) -> String:
+    def hexdigest_xof(var self, length: Int) raises -> String:
+        if length < 0:
+            raise Error("BLAKE3 XOF length must not be negative")
         return self._core.hexdigest_xof(length)
 
     def finish(var self) -> UInt64:

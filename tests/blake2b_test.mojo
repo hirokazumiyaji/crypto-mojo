@@ -1,6 +1,6 @@
 from crypto.blake2b import BLAKE2b
 from std.collections import List
-from std.testing import TestSuite, assert_equal
+from std.testing import TestSuite, assert_equal, assert_raises
 
 
 def test_blake2b_empty() raises:
@@ -87,6 +87,15 @@ def test_blake2b_digest_lengths() raises:
     assert_equal(len(digest_512), 64)
     var digest_256 = BLAKE2b(digest_size=32).digest()
     assert_equal(len(digest_256), 32)
+
+
+def test_blake2b_rejects_invalid_digest_sizes() raises:
+    with assert_raises():
+        _ = BLAKE2b(digest_size=0)
+    with assert_raises():
+        _ = BLAKE2b(digest_size=-1)
+    with assert_raises():
+        _ = BLAKE2b(digest_size=65)
 
 
 def test_blake2b_finish() raises:

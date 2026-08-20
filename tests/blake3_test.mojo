@@ -1,6 +1,6 @@
 from crypto.blake3 import BLAKE3
 from std.collections import List
-from std.testing import TestSuite, assert_equal
+from std.testing import TestSuite, assert_equal, assert_raises
 
 
 def test_blake3_empty() raises:
@@ -56,6 +56,13 @@ def test_blake3_keyed_hash() raises:
     )
 
 
+def test_blake3_rejects_invalid_key_lengths() raises:
+    with assert_raises():
+        _ = BLAKE3("short key".as_bytes())
+    with assert_raises():
+        _ = BLAKE3("this key is longer than thirty-two bytes".as_bytes())
+
+
 def test_blake3_xof() raises:
     var hasher = BLAKE3()
     assert_equal(
@@ -64,6 +71,18 @@ def test_blake3_xof() raises:
     )
     var digest = BLAKE3().digest_xof(100)
     assert_equal(len(digest), 100)
+
+
+def test_blake3_xof_rejects_negative_length() raises:
+    with assert_raises():
+        _ = BLAKE3().digest_xof(-1)
+    with assert_raises():
+        _ = BLAKE3().hexdigest_xof(-1)
+
+
+def test_blake3_xof_accepts_zero_length() raises:
+    assert_equal(len(BLAKE3().digest_xof(0)), 0)
+    assert_equal(BLAKE3().hexdigest_xof(0), "")
 
 
 def test_blake3_finish() raises:

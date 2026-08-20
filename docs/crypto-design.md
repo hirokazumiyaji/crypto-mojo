@@ -50,6 +50,10 @@ crypto
 `crypto.blake2b`は`BLAKE2b`を公開する。
 `crypto.blake3`は`BLAKE3`を公開する。
 
+`BLAKE2b`の`digest_size`は1 byte以上64 byte以下とする。
+`BLAKE3`のkeyed modeは32-byte鍵だけを受け入れる。
+`BLAKE3`の`digest_xof`と`hexdigest_xof`は0以上の出力長を受け入れる。
+
 これらの実装は既存の`hash-mojo`から移し、`crypto`パッケージの実体とする。
 各ハッシュ型はMojo標準の`std.hashlib.Hasher` traitに準拠し続ける。
 `crypto.__init__`はサブモジュールの型や関数を一括で再公開しない。
@@ -177,6 +181,10 @@ PBKDF2-HMACはRFC 8018に従う。
 反復回数に恣意的な上限は設けない。
 
 ## エラー処理
+
+BLAKE2bは範囲外の`digest_size`を`Error`としてraiseする。
+BLAKE3は32 byteではない鍵と負のXOF出力長を`Error`としてraiseする。
+XOF出力長0は空のダイジェストまたは空文字列を返す。
 
 HMACの初期化、更新、確定は通常の入力でraiseしない。
 MACの長さが異なる比較は`False`を返す。

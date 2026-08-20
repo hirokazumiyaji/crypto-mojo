@@ -413,7 +413,9 @@ struct BLAKE2b(Defaultable, Hasher):
     def __init__(out self):
         self._core = _BLAKE2bCore(64)
 
-    def __init__(out self, digest_size: Int):
+    def __init__(out self, digest_size: Int) raises:
+        if digest_size < 1 or digest_size > 64:
+            raise Error("BLAKE2b digest size must be between 1 and 64 bytes")
         self._core = _BLAKE2bCore(digest_size)
 
     def update_bytes(mut self, data: Span[Byte, _]):
