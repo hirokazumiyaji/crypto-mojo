@@ -316,7 +316,7 @@ This milestone does not include:
 - Serialize/deserialize of hash, HMAC, or HKDF reader state
 - FIPS 140 compliance claims
 - SIMD or assembly optimization
-- Benchmark performance targets
+- Benchmark performance targets (a local `pixi run bench` harness exists for measurement only; CI does not enforce numbers)
 - Deleting the existing `hash` package on prefix.dev
 
 Deleting the existing `hash` package is a separate task after `crypto` package tests, precompilation, and distribution checks are complete.

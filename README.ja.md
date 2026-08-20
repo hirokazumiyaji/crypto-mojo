@@ -123,10 +123,14 @@ pixi install --locked
 pixi run format
 pixi run test
 pixi run test-consumer
+pixi run bench
 ```
 
 個別のテストには`pixi run test-sha256`のようなタスクを利用できます。
 `test-consumer`は`crypto.mojoc`を`/tmp`へprecompileし、`src`をimport pathへ加えずに配布後のimportを検証します。
+
+`pixi run bench`は`benchmarks/`配下のマイクロベンチマークをMojoの`std.benchmark`で実行し、スループット（ハッシュならGB/sなど）を表示します。
+計測用のハーネスであり、CIは性能目標の合否を判定しません。
 
 ローカルで任意のMojoプログラムからprecompile済みパッケージを使う場合は、次のように実行します。
 

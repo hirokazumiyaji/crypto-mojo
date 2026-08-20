@@ -5,7 +5,8 @@ platforms = ["osx-arm64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
-format = "mojo format src/crypto/*.mojo tests/*.mojo conda.recipe/test.mojo"
+format = "mojo format src/crypto/*.mojo tests/*.mojo benchmarks/*.mojo conda.recipe/test.mojo"
+bench = "mojo run -I src benchmarks/crypto_bench.mojo"
 test-md5 = "mojo run -I src tests/md5_test.mojo"
 test-sha1 = "mojo run -I src tests/sha1_test.mojo"
 test-sha256 = "mojo run -I src tests/sha256_test.mojo"

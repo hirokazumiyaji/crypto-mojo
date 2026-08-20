@@ -123,10 +123,14 @@ pixi install --locked
 pixi run format
 pixi run test
 pixi run test-consumer
+pixi run bench
 ```
 
 Use tasks such as `pixi run test-sha256` for individual tests.
 `test-consumer` precompiles `crypto.mojoc` into `/tmp` and verifies post-distribution imports without adding `src` to the import path.
+
+`pixi run bench` runs microbenchmarks under `benchmarks/` via Mojo's `std.benchmark` and prints throughput (for example GB/s for hashing).
+It is a measurement harness only — CI does not enforce performance targets.
 
 To use the precompiled package from an arbitrary local Mojo program:
 

@@ -316,7 +316,7 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 - ハッシュ、HMAC、HKDF readerの状態のserialize/deserialize
 - FIPS 140への準拠表明
 - SIMDまたはアセンブリによる最適化
-- ベンチマーク上の性能目標
+- ベンチマーク上の性能目標（計測用にローカルの`pixi run bench`はあるが、CIは数値の合否を見ない）
 - prefix.dev上の既存`hash`パッケージの削除操作
 
 既存`hash`パッケージの削除は、`crypto`パッケージのテスト、precompile、配布確認が完了した後に別作業として行う。
