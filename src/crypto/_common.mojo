@@ -3,31 +3,25 @@ from std.collections import List, Span
 comptime _HEX_DIGITS: StaticString = "0123456789abcdef"
 
 
+trait HashFunction(Copyable, Defaultable, Deinitable, Movable):
+    """A block-based hash with the streaming interface HMAC needs."""
+
+    comptime block_size: Int
+    comptime digest_size: Int
+
+    def update_bytes(mut self, data: Span[Byte, _]):
+        ...
+
+    def digest(var self) -> List[UInt8]:
+        ...
+
+
 def bytes_to_hex(data: List[UInt8]) -> String:
-    var output = String()
+    var output = String(capacity=len(data) * 2)
     for value in data:
         output += _HEX_DIGITS[byte=Int(value >> 4)]
         output += _HEX_DIGITS[byte=Int(value & 0x0F)]
     return output^
-
-
-def rotate_left_u32(value: UInt32, shift: Int) -> UInt32:
-    return (value << UInt32(shift)) | (value >> UInt32(32 - shift))
-
-
-def rotate_right_u32(value: UInt32, shift: Int) -> UInt32:
-    return (value >> UInt32(shift)) | (value << UInt32(32 - shift))
-
-
-def rotate_left_u64(value: UInt64, shift: Int) -> UInt64:
-    # Guarded because SHA-3 rotates lane 0 by 0, and a 64-bit shift is UB.
-    if shift == 0:
-        return value
-    return (value << UInt64(shift)) | (value >> UInt64(64 - shift))
-
-
-def rotate_right_u64(value: UInt64, shift: Int) -> UInt64:
-    return (value >> UInt64(shift)) | (value << UInt64(64 - shift))
 
 
 def read_le_u32(data: Span[Byte, _], offset: Int) -> UInt32:
@@ -79,10 +73,8 @@ def write_be_u64[
 
 
 def append_le_u32(mut output: List[UInt8], value: UInt32):
-    output.append((value & 0xFF).cast[DType.uint8]())
-    output.append(((value >> 8) & 0xFF).cast[DType.uint8]())
-    output.append(((value >> 16) & 0xFF).cast[DType.uint8]())
-    output.append(((value >> 24) & 0xFF).cast[DType.uint8]())
+    for i in range(4):
+        output.append(((value >> UInt32(i * 8)) & 0xFF).cast[DType.uint8]())
 
 
 def append_le_u64(mut output: List[UInt8], value: UInt64):
@@ -91,10 +83,10 @@ def append_le_u64(mut output: List[UInt8], value: UInt64):
 
 
 def append_be_u32(mut output: List[UInt8], value: UInt32):
-    output.append(((value >> 24) & 0xFF).cast[DType.uint8]())
-    output.append(((value >> 16) & 0xFF).cast[DType.uint8]())
-    output.append(((value >> 8) & 0xFF).cast[DType.uint8]())
-    output.append((value & 0xFF).cast[DType.uint8]())
+    for i in range(4):
+        output.append(
+            ((value >> UInt32(24 - i * 8)) & 0xFF).cast[DType.uint8]()
+        )
 
 
 def append_be_u64(mut output: List[UInt8], value: UInt64):

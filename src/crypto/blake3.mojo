@@ -1,3 +1,4 @@
+from std.bit import rotate_bits_right
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
@@ -6,7 +7,6 @@ from ._common import (
     bytes_to_hex,
     read_le_u32,
     read_le_u64,
-    rotate_right_u32,
     simd_lanes_le_u32,
 )
 
@@ -22,133 +22,14 @@ comptime _IV = [
     UInt32(0x5BE0CD19),
 ]
 
-comptime _MESSAGE_SCHEDULE = [
-    [
-        Int(0),
-        Int(1),
-        Int(2),
-        Int(3),
-        Int(4),
-        Int(5),
-        Int(6),
-        Int(7),
-        Int(8),
-        Int(9),
-        Int(10),
-        Int(11),
-        Int(12),
-        Int(13),
-        Int(14),
-        Int(15),
-    ],
-    [
-        Int(2),
-        Int(6),
-        Int(3),
-        Int(10),
-        Int(7),
-        Int(0),
-        Int(4),
-        Int(13),
-        Int(1),
-        Int(11),
-        Int(12),
-        Int(5),
-        Int(9),
-        Int(14),
-        Int(15),
-        Int(8),
-    ],
-    [
-        Int(3),
-        Int(4),
-        Int(10),
-        Int(12),
-        Int(13),
-        Int(2),
-        Int(7),
-        Int(14),
-        Int(6),
-        Int(5),
-        Int(9),
-        Int(0),
-        Int(11),
-        Int(15),
-        Int(8),
-        Int(1),
-    ],
-    [
-        Int(10),
-        Int(7),
-        Int(12),
-        Int(9),
-        Int(14),
-        Int(3),
-        Int(13),
-        Int(15),
-        Int(4),
-        Int(0),
-        Int(11),
-        Int(2),
-        Int(5),
-        Int(8),
-        Int(1),
-        Int(6),
-    ],
-    [
-        Int(12),
-        Int(13),
-        Int(9),
-        Int(11),
-        Int(15),
-        Int(10),
-        Int(14),
-        Int(8),
-        Int(7),
-        Int(2),
-        Int(5),
-        Int(3),
-        Int(0),
-        Int(1),
-        Int(6),
-        Int(4),
-    ],
-    [
-        Int(9),
-        Int(14),
-        Int(11),
-        Int(5),
-        Int(8),
-        Int(12),
-        Int(15),
-        Int(1),
-        Int(13),
-        Int(3),
-        Int(0),
-        Int(10),
-        Int(2),
-        Int(6),
-        Int(4),
-        Int(7),
-    ],
-    [
-        Int(11),
-        Int(15),
-        Int(5),
-        Int(0),
-        Int(1),
-        Int(9),
-        Int(8),
-        Int(6),
-        Int(14),
-        Int(10),
-        Int(2),
-        Int(12),
-        Int(3),
-        Int(4),
-        Int(7),
-        Int(13),
-    ],
+comptime _MESSAGE_SCHEDULE: List[List[Int]] = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8],
+    [3, 4, 10, 12, 13, 2, 7, 14, 6, 5, 9, 0, 11, 15, 8, 1],
+    [10, 7, 12, 9, 14, 3, 13, 15, 4, 0, 11, 2, 5, 8, 1, 6],
+    [12, 13, 9, 11, 15, 10, 14, 8, 7, 2, 5, 3, 0, 1, 6, 4],
+    [9, 14, 11, 5, 8, 12, 15, 1, 13, 3, 0, 10, 2, 6, 4, 7],
+    [11, 15, 5, 0, 1, 9, 8, 6, 14, 10, 2, 12, 3, 4, 7, 13],
 ]
 
 comptime _CHUNK_START = UInt32(1)
@@ -168,13 +49,13 @@ def _g(
     y: UInt32,
 ):
     v[a] = v[a] + v[b] + x
-    v[d] = rotate_right_u32(v[d] ^ v[a], 16)
+    v[d] = rotate_bits_right[16](v[d] ^ v[a])
     v[c] = v[c] + v[d]
-    v[b] = rotate_right_u32(v[b] ^ v[c], 12)
+    v[b] = rotate_bits_right[12](v[b] ^ v[c])
     v[a] = v[a] + v[b] + y
-    v[d] = rotate_right_u32(v[d] ^ v[a], 8)
+    v[d] = rotate_bits_right[8](v[d] ^ v[a])
     v[c] = v[c] + v[d]
-    v[b] = rotate_right_u32(v[b] ^ v[c], 7)
+    v[b] = rotate_bits_right[7](v[b] ^ v[c])
 
 
 def _compress(
@@ -194,14 +75,15 @@ def _compress(
     v[15] = flags
 
     comptime for round in range(7):
+        comptime s = _MESSAGE_SCHEDULE[round]
         _g(
             v,
             0,
             4,
             8,
             12,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][0]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][1]]()],
+            block_words[materialize[s[0]]()],
+            block_words[materialize[s[1]]()],
         )
         _g(
             v,
@@ -209,8 +91,8 @@ def _compress(
             5,
             9,
             13,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][2]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][3]]()],
+            block_words[materialize[s[2]]()],
+            block_words[materialize[s[3]]()],
         )
         _g(
             v,
@@ -218,8 +100,8 @@ def _compress(
             6,
             10,
             14,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][4]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][5]]()],
+            block_words[materialize[s[4]]()],
+            block_words[materialize[s[5]]()],
         )
         _g(
             v,
@@ -227,8 +109,8 @@ def _compress(
             7,
             11,
             15,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][6]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][7]]()],
+            block_words[materialize[s[6]]()],
+            block_words[materialize[s[7]]()],
         )
         _g(
             v,
@@ -236,8 +118,8 @@ def _compress(
             5,
             10,
             15,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][8]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][9]]()],
+            block_words[materialize[s[8]]()],
+            block_words[materialize[s[9]]()],
         )
         _g(
             v,
@@ -245,8 +127,8 @@ def _compress(
             6,
             11,
             12,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][10]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][11]]()],
+            block_words[materialize[s[10]]()],
+            block_words[materialize[s[11]]()],
         )
         _g(
             v,
@@ -254,8 +136,8 @@ def _compress(
             7,
             8,
             13,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][12]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][13]]()],
+            block_words[materialize[s[12]]()],
+            block_words[materialize[s[13]]()],
         )
         _g(
             v,
@@ -263,8 +145,8 @@ def _compress(
             4,
             9,
             14,
-            block_words[materialize[_MESSAGE_SCHEDULE[round][14]]()],
-            block_words[materialize[_MESSAGE_SCHEDULE[round][15]]()],
+            block_words[materialize[s[14]]()],
+            block_words[materialize[s[15]]()],
         )
 
     var output = InlineArray[UInt32, 16](uninitialized=True)
@@ -418,9 +300,11 @@ def _key_words(key: Span[Byte, _]) -> InlineArray[UInt32, 8]:
 
 
 struct _BLAKE3Core:
+    # One chaining value per tree level; 54 levels cover the 2^64-byte
+    # (2^54-chunk) input limit.
     var _key_words: InlineArray[UInt32, 8]
     var _chunk: _BLAKE3ChunkState
-    var _stack: InlineArray[UInt32, 432]
+    var _stack: InlineArray[InlineArray[UInt32, 8], 54]
     var _stack_len: Int
     var _flags: UInt32
 
@@ -431,7 +315,9 @@ struct _BLAKE3Core:
     ):
         self._key_words = key_words.copy()
         self._chunk = _BLAKE3ChunkState(key_words, 0, flags)
-        self._stack = InlineArray[UInt32, 432](fill=0)
+        self._stack = InlineArray[InlineArray[UInt32, 8], 54](
+            fill=InlineArray[UInt32, 8](fill=0)
+        )
         self._stack_len = 0
         self._flags = flags
 
@@ -461,14 +347,12 @@ struct _BLAKE3Core:
         var current = cv.copy()
         while (total_chunks & UInt64(1)) == 0:
             self._stack_len -= 1
-            var left = InlineArray[UInt32, 8](uninitialized=True)
-            for i in range(8):
-                left[i] = self._stack[self._stack_len * 8 + i]
-            var parent = self._parent_output(left, current)
+            var parent = self._parent_output(
+                self._stack[self._stack_len], current
+            )
             current = parent.chaining_value()
             total_chunks >>= UInt64(1)
-        for i in range(8):
-            self._stack[self._stack_len * 8 + i] = current[i]
+        self._stack[self._stack_len] = current^
         self._stack_len += 1
 
     def _finish_chunk(mut self):
@@ -493,10 +377,7 @@ struct _BLAKE3Core:
         var current = output.chaining_value()
         while self._stack_len > 0:
             self._stack_len -= 1
-            var left = InlineArray[UInt32, 8](uninitialized=True)
-            for i in range(8):
-                left[i] = self._stack[self._stack_len * 8 + i]
-            output = self._parent_output(left, current)
+            output = self._parent_output(self._stack[self._stack_len], current)
             current = output.chaining_value()
         return output^
 

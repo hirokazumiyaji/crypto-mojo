@@ -1,3 +1,4 @@
+from std.bit import rotate_bits_left
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
@@ -5,7 +6,6 @@ from ._common import (
     append_le_u64,
     bytes_to_hex,
     read_le_u64,
-    rotate_left_u64,
     simd_lanes_le_u64,
 )
 
@@ -37,32 +37,13 @@ comptime _ROUND_CONSTANTS = [
     UInt64(0x8000000080008008),
 ]
 
-comptime _ROTATION_OFFSETS = [
-    Int(0),
-    Int(1),
-    Int(62),
-    Int(28),
-    Int(27),
-    Int(36),
-    Int(44),
-    Int(6),
-    Int(55),
-    Int(20),
-    Int(3),
-    Int(10),
-    Int(43),
-    Int(25),
-    Int(39),
-    Int(41),
-    Int(45),
-    Int(15),
-    Int(21),
-    Int(8),
-    Int(18),
-    Int(2),
-    Int(61),
-    Int(56),
-    Int(14),
+# Indexed as [y][x], matching the state layout state[x + 5 * y].
+comptime _ROTATION_OFFSETS: List[List[Int]] = [
+    [0, 1, 62, 28, 27],
+    [36, 44, 6, 55, 20],
+    [3, 10, 43, 25, 39],
+    [41, 45, 15, 21, 8],
+    [18, 2, 61, 56, 14],
 ]
 
 
@@ -73,7 +54,7 @@ def _block_lanes(block: Span[Byte, _]) -> InlineArray[UInt64, 17]:
     return lanes^
 
 
-struct _SHA3_256Core:
+struct SHA3_256(Defaultable, Hasher):
     var _state: InlineArray[UInt64, 25]
     var _buffer: InlineArray[UInt8, 136]
     var _buffer_len: Int
@@ -86,7 +67,7 @@ struct _SHA3_256Core:
     def _permute(mut self):
         var c = InlineArray[UInt64, 5](uninitialized=True)
         var d = InlineArray[UInt64, 5](uninitialized=True)
-        var b = InlineArray[UInt64, 25](uninitialized=True)
+        var b = InlineArray[UInt64, 5 * 5](uninitialized=True)
         comptime for round in range(24):
             comptime for x in range(5):
                 c[x] = (
@@ -97,25 +78,21 @@ struct _SHA3_256Core:
                     ^ self._state[x + 20]
                 )
             comptime for x in range(5):
-                d[x] = c[(x + 4) % 5] ^ rotate_left_u64(c[(x + 1) % 5], 1)
+                d[x] = c[(x + 4) % 5] ^ rotate_bits_left[1](c[(x + 1) % 5])
             comptime for y in range(5):
                 comptime for x in range(5):
                     self._state[x + 5 * y] ^= d[x]
             comptime for y in range(5):
                 comptime for x in range(5):
-                    b[y + 5 * ((2 * x + 3 * y) % 5)] = rotate_left_u64(
-                        self._state[x + 5 * y],
-                        materialize[_ROTATION_OFFSETS[x + 5 * y]](),
-                    )
+                    b[y + 5 * ((2 * x + 3 * y) % 5)] = rotate_bits_left[
+                        _ROTATION_OFFSETS[y][x]
+                    ](self._state[x + 5 * y])
             comptime for y in range(5):
                 comptime for x in range(5):
                     self._state[x + 5 * y] = b[x + 5 * y] ^ (
                         (~b[(x + 1) % 5 + 5 * y]) & b[(x + 2) % 5 + 5 * y]
                     )
             self._state[0] ^= materialize[_ROUND_CONSTANTS[round]]()
-
-    def _process_block(mut self, block: Span[Byte, _]):
-        self._absorb(_block_lanes(block))
 
     def _absorb(mut self, lanes: InlineArray[UInt64, 17]):
         for i in range(17):
@@ -139,15 +116,21 @@ struct _SHA3_256Core:
             if self._buffer_len == 136:
                 self._process_buffer()
         while offset + 136 <= len(data):
-            self._process_block(data[offset : offset + 136])
+            self._absorb(_block_lanes(data[offset : offset + 136]))
             offset += 136
         for i in range(offset, len(data)):
             self._buffer[self._buffer_len] = data[i]
             self._buffer_len += 1
 
+    def _update_with_bytes(mut self, data: Span[Byte, _]):
+        self.update_bytes(data)
+
     def _update_with_simd(mut self, value: SIMD[_, _]):
         var bytes = simd_lanes_le_u64(value)
         self.update_bytes(bytes[:])
+
+    def update(mut self, value: Some[Hashable]):
+        value.__hash__(self)
 
     def _finalize(mut self):
         self._buffer[self._buffer_len] = 0x06
@@ -158,44 +141,16 @@ struct _SHA3_256Core:
         self._buffer[135] |= 0x80
         self._process_buffer()
 
-    def digest(mut self) -> List[UInt8]:
+    def digest(var self) -> List[UInt8]:
         self._finalize()
         var output = List[UInt8](capacity=32)
         for i in range(4):
             append_le_u64(output, self._state[i])
         return output^
 
-    def hexdigest(mut self) -> String:
-        return bytes_to_hex(self.digest())
-
-    def finish(mut self) -> UInt64:
-        self._finalize()
-        return self._state[0]
-
-
-struct SHA3_256(Defaultable, Hasher):
-    var _core: _SHA3_256Core
-
-    def __init__(out self):
-        self._core = _SHA3_256Core()
-
-    def update_bytes(mut self, data: Span[Byte, _]):
-        self._core.update_bytes(data)
-
-    def _update_with_bytes(mut self, data: Span[Byte, _]):
-        self._core.update_bytes(data)
-
-    def _update_with_simd(mut self, value: SIMD[_, _]):
-        self._core._update_with_simd(value)
-
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
-
-    def digest(var self) -> List[UInt8]:
-        return self._core.digest()
-
     def hexdigest(var self) -> String:
-        return self._core.hexdigest()
+        return bytes_to_hex(self^.digest())
 
     def finish(var self) -> UInt64:
-        return self._core.finish()
+        self._finalize()
+        return self._state[0]

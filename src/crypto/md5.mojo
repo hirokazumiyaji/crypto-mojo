@@ -1,3 +1,4 @@
+from std.bit import rotate_bits_left
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
@@ -5,7 +6,6 @@ from ._common import (
     append_le_u32,
     bytes_to_hex,
     read_le_u32,
-    rotate_left_u32,
     simd_lanes_le_u64,
     write_le_u64,
 )
@@ -154,19 +154,13 @@ def _block_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
 
 
 struct MD5(Defaultable, Hasher):
-    var _a: UInt32
-    var _b: UInt32
-    var _c: UInt32
-    var _d: UInt32
+    var _state: InlineArray[UInt32, 4]
     var _buffer: InlineArray[UInt8, 64]
     var _buffer_len: Int
     var _bit_length: UInt64
 
     def __init__(out self):
-        self._a = 0x67452301
-        self._b = 0xEFCDAB89
-        self._c = 0x98BADCFE
-        self._d = 0x10325476
+        self._state = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476]
         self._buffer = InlineArray[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
@@ -175,10 +169,10 @@ struct MD5(Defaultable, Hasher):
         self._process_words(_block_words(block))
 
     def _process_words(mut self, words: InlineArray[UInt32, 16]):
-        var a = self._a
-        var b = self._b
-        var c = self._c
-        var d = self._d
+        var a = self._state[0]
+        var b = self._state[1]
+        var c = self._state[2]
+        var d = self._state[3]
         comptime for i in range(64):
             var f: UInt32
             var g: Int
@@ -198,12 +192,12 @@ struct MD5(Defaultable, Hasher):
             a = d
             d = c
             c = b
-            b = b + rotate_left_u32(value, materialize[_SHIFT[i]]())
+            b = b + rotate_bits_left[_SHIFT[i]](value)
 
-        self._a += a
-        self._b += b
-        self._c += c
-        self._d += d
+        self._state[0] += a
+        self._state[1] += b
+        self._state[2] += c
+        self._state[3] += d
 
     def _process_buffer(mut self):
         var words = _block_words(Span(self._buffer))
@@ -256,10 +250,8 @@ struct MD5(Defaultable, Hasher):
     def digest(var self) -> List[UInt8]:
         self._finalize()
         var output = List[UInt8](capacity=16)
-        append_le_u32(output, self._a)
-        append_le_u32(output, self._b)
-        append_le_u32(output, self._c)
-        append_le_u32(output, self._d)
+        for i in range(4):
+            append_le_u32(output, self._state[i])
         return output^
 
     def hexdigest(var self) -> String:
@@ -267,6 +259,6 @@ struct MD5(Defaultable, Hasher):
 
     def finish(var self) -> UInt64:
         self._finalize()
-        return self._a.cast[DType.uint64]() | (
-            self._b.cast[DType.uint64]() << UInt64(32)
+        return self._state[0].cast[DType.uint64]() | (
+            self._state[1].cast[DType.uint64]() << UInt64(32)
         )

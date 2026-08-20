@@ -1,3 +1,4 @@
+from std.bit import rotate_bits_right
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
@@ -5,7 +6,6 @@ from ._common import (
     append_le_u64,
     bytes_to_hex,
     read_le_u64,
-    rotate_right_u64,
     simd_lanes_le_u64,
 )
 
@@ -21,187 +21,17 @@ comptime _IV = [
     UInt64(0x5BE0CD19137E2179),
 ]
 
-comptime _SIGMA = [
-    [
-        Int(0),
-        Int(1),
-        Int(2),
-        Int(3),
-        Int(4),
-        Int(5),
-        Int(6),
-        Int(7),
-        Int(8),
-        Int(9),
-        Int(10),
-        Int(11),
-        Int(12),
-        Int(13),
-        Int(14),
-        Int(15),
-    ],
-    [
-        Int(14),
-        Int(10),
-        Int(4),
-        Int(8),
-        Int(9),
-        Int(15),
-        Int(13),
-        Int(6),
-        Int(1),
-        Int(12),
-        Int(0),
-        Int(2),
-        Int(11),
-        Int(7),
-        Int(5),
-        Int(3),
-    ],
-    [
-        Int(11),
-        Int(8),
-        Int(12),
-        Int(0),
-        Int(5),
-        Int(2),
-        Int(15),
-        Int(13),
-        Int(10),
-        Int(14),
-        Int(3),
-        Int(6),
-        Int(7),
-        Int(1),
-        Int(9),
-        Int(4),
-    ],
-    [
-        Int(7),
-        Int(9),
-        Int(3),
-        Int(1),
-        Int(13),
-        Int(12),
-        Int(11),
-        Int(14),
-        Int(2),
-        Int(6),
-        Int(5),
-        Int(10),
-        Int(4),
-        Int(0),
-        Int(15),
-        Int(8),
-    ],
-    [
-        Int(9),
-        Int(0),
-        Int(5),
-        Int(7),
-        Int(2),
-        Int(4),
-        Int(10),
-        Int(15),
-        Int(14),
-        Int(1),
-        Int(11),
-        Int(12),
-        Int(6),
-        Int(8),
-        Int(3),
-        Int(13),
-    ],
-    [
-        Int(2),
-        Int(12),
-        Int(6),
-        Int(10),
-        Int(0),
-        Int(11),
-        Int(8),
-        Int(3),
-        Int(4),
-        Int(13),
-        Int(7),
-        Int(5),
-        Int(15),
-        Int(14),
-        Int(1),
-        Int(9),
-    ],
-    [
-        Int(12),
-        Int(5),
-        Int(1),
-        Int(15),
-        Int(14),
-        Int(13),
-        Int(4),
-        Int(10),
-        Int(0),
-        Int(7),
-        Int(6),
-        Int(3),
-        Int(9),
-        Int(2),
-        Int(8),
-        Int(11),
-    ],
-    [
-        Int(13),
-        Int(11),
-        Int(7),
-        Int(14),
-        Int(12),
-        Int(1),
-        Int(3),
-        Int(9),
-        Int(5),
-        Int(0),
-        Int(15),
-        Int(4),
-        Int(8),
-        Int(6),
-        Int(2),
-        Int(10),
-    ],
-    [
-        Int(6),
-        Int(15),
-        Int(14),
-        Int(9),
-        Int(11),
-        Int(3),
-        Int(0),
-        Int(8),
-        Int(12),
-        Int(2),
-        Int(13),
-        Int(7),
-        Int(1),
-        Int(4),
-        Int(10),
-        Int(5),
-    ],
-    [
-        Int(10),
-        Int(2),
-        Int(8),
-        Int(4),
-        Int(7),
-        Int(6),
-        Int(1),
-        Int(5),
-        Int(15),
-        Int(11),
-        Int(9),
-        Int(14),
-        Int(3),
-        Int(12),
-        Int(13),
-        Int(0),
-    ],
+comptime _SIGMA: List[List[Int]] = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+    [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
+    [7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8],
+    [9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13],
+    [2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9],
+    [12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11],
+    [13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10],
+    [6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5],
+    [10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0],
 ]
 
 
@@ -215,13 +45,13 @@ def _g(
     y: UInt64,
 ):
     v[a] = v[a] + v[b] + x
-    v[d] = rotate_right_u64(v[d] ^ v[a], 32)
+    v[d] = rotate_bits_right[32](v[d] ^ v[a])
     v[c] = v[c] + v[d]
-    v[b] = rotate_right_u64(v[b] ^ v[c], 24)
+    v[b] = rotate_bits_right[24](v[b] ^ v[c])
     v[a] = v[a] + v[b] + y
-    v[d] = rotate_right_u64(v[d] ^ v[a], 16)
+    v[d] = rotate_bits_right[16](v[d] ^ v[a])
     v[c] = v[c] + v[d]
-    v[b] = rotate_right_u64(v[b] ^ v[c], 63)
+    v[b] = rotate_bits_right[63](v[b] ^ v[c])
 
 
 def _block_words(block: Span[Byte, _]) -> InlineArray[UInt64, 16]:
@@ -263,9 +93,6 @@ struct _BLAKE2bCore:
         if self._t0 < previous:
             self._t1 += 1
 
-    def _compress(mut self, block: Span[Byte, _]):
-        self._compress_words(_block_words(block))
-
     def _compress_words(mut self, m: InlineArray[UInt64, 16]):
         var v = InlineArray[UInt64, 16](uninitialized=True)
         comptime for i in range(8):
@@ -276,59 +103,20 @@ struct _BLAKE2bCore:
         v[14] ^= self._f0
 
         comptime for round in range(12):
-            _g(
-                v,
-                0,
-                4,
-                8,
-                12,
-                m[materialize[_SIGMA[round % 10][0]]()],
-                m[materialize[_SIGMA[round % 10][1]]()],
-            )
-            _g(
-                v,
-                1,
-                5,
-                9,
-                13,
-                m[materialize[_SIGMA[round % 10][2]]()],
-                m[materialize[_SIGMA[round % 10][3]]()],
-            )
-            _g(
-                v,
-                2,
-                6,
-                10,
-                14,
-                m[materialize[_SIGMA[round % 10][4]]()],
-                m[materialize[_SIGMA[round % 10][5]]()],
-            )
-            _g(
-                v,
-                3,
-                7,
-                11,
-                15,
-                m[materialize[_SIGMA[round % 10][6]]()],
-                m[materialize[_SIGMA[round % 10][7]]()],
-            )
-            _g(
-                v,
-                0,
-                5,
-                10,
-                15,
-                m[materialize[_SIGMA[round % 10][8]]()],
-                m[materialize[_SIGMA[round % 10][9]]()],
-            )
+            comptime s = _SIGMA[round % 10]
+            _g(v, 0, 4, 8, 12, m[materialize[s[0]]()], m[materialize[s[1]]()])
+            _g(v, 1, 5, 9, 13, m[materialize[s[2]]()], m[materialize[s[3]]()])
+            _g(v, 2, 6, 10, 14, m[materialize[s[4]]()], m[materialize[s[5]]()])
+            _g(v, 3, 7, 11, 15, m[materialize[s[6]]()], m[materialize[s[7]]()])
+            _g(v, 0, 5, 10, 15, m[materialize[s[8]]()], m[materialize[s[9]]()])
             _g(
                 v,
                 1,
                 6,
                 11,
                 12,
-                m[materialize[_SIGMA[round % 10][10]]()],
-                m[materialize[_SIGMA[round % 10][11]]()],
+                m[materialize[s[10]]()],
+                m[materialize[s[11]]()],
             )
             _g(
                 v,
@@ -336,8 +124,8 @@ struct _BLAKE2bCore:
                 7,
                 8,
                 13,
-                m[materialize[_SIGMA[round % 10][12]]()],
-                m[materialize[_SIGMA[round % 10][13]]()],
+                m[materialize[s[12]]()],
+                m[materialize[s[13]]()],
             )
             _g(
                 v,
@@ -345,8 +133,8 @@ struct _BLAKE2bCore:
                 4,
                 9,
                 14,
-                m[materialize[_SIGMA[round % 10][14]]()],
-                m[materialize[_SIGMA[round % 10][15]]()],
+                m[materialize[s[14]]()],
+                m[materialize[s[15]]()],
             )
 
         for i in range(8):
@@ -371,7 +159,7 @@ struct _BLAKE2bCore:
                 self._process_buffer()
         while offset + 128 < len(data):
             self._increment_counter(UInt64(128))
-            self._compress(data[offset : offset + 128])
+            self._compress_words(_block_words(data[offset : offset + 128]))
             offset += 128
         for i in range(offset, len(data)):
             self._buffer[self._buffer_len] = data[i]
@@ -394,10 +182,8 @@ struct _BLAKE2bCore:
         var full = List[UInt8](capacity=64)
         for i in range(8):
             append_le_u64(full, self._h[i])
-        var output = List[UInt8](capacity=self._digest_size)
-        for i in range(self._digest_size):
-            output.append(full[i])
-        return output^
+        full.resize(self._digest_size, 0)
+        return full^
 
     def hexdigest(mut self) -> String:
         return bytes_to_hex(self.digest())

@@ -6,7 +6,5 @@ def constant_time_compare(left: Span[Byte, _], right: Span[Byte, _]) -> Bool:
         return False
     var difference = UInt8(0)
     for i in range(len(left)):
-        var left_byte = left[i].cast[DType.uint8]()
-        var right_byte = right[i].cast[DType.uint8]()
-        difference |= left_byte ^ right_byte
+        difference |= left[i] ^ right[i]
     return difference == 0

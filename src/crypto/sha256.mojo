@@ -1,11 +1,12 @@
+from std.bit import rotate_bits_right
 from std.collections import List, Span
 from std.hashlib.hasher import Hasher
 
 from ._common import (
+    HashFunction,
     append_be_u32,
     bytes_to_hex,
     read_be_u32,
-    rotate_right_u32,
     simd_lanes_be_u64,
     write_be_u64,
 )
@@ -81,32 +82,32 @@ comptime _K = [
 
 def _big_sigma_zero(value: UInt32) -> UInt32:
     return (
-        rotate_right_u32(value, 2)
-        ^ rotate_right_u32(value, 13)
-        ^ rotate_right_u32(value, 22)
+        rotate_bits_right[2](value)
+        ^ rotate_bits_right[13](value)
+        ^ rotate_bits_right[22](value)
     )
 
 
 def _big_sigma_one(value: UInt32) -> UInt32:
     return (
-        rotate_right_u32(value, 6)
-        ^ rotate_right_u32(value, 11)
-        ^ rotate_right_u32(value, 25)
+        rotate_bits_right[6](value)
+        ^ rotate_bits_right[11](value)
+        ^ rotate_bits_right[25](value)
     )
 
 
 def _small_sigma_zero(value: UInt32) -> UInt32:
     return (
-        rotate_right_u32(value, 7)
-        ^ rotate_right_u32(value, 18)
+        rotate_bits_right[7](value)
+        ^ rotate_bits_right[18](value)
         ^ (value >> UInt32(3))
     )
 
 
 def _small_sigma_one(value: UInt32) -> UInt32:
     return (
-        rotate_right_u32(value, 17)
-        ^ rotate_right_u32(value, 19)
+        rotate_bits_right[17](value)
+        ^ rotate_bits_right[19](value)
         ^ (value >> UInt32(10))
     )
 
@@ -122,28 +123,26 @@ def _message_schedule(block: Span[Byte, _]) -> InlineArray[UInt32, 64]:
     return words^
 
 
-struct SHA256(Defaultable, Hasher):
-    var _h0: UInt32
-    var _h1: UInt32
-    var _h2: UInt32
-    var _h3: UInt32
-    var _h4: UInt32
-    var _h5: UInt32
-    var _h6: UInt32
-    var _h7: UInt32
+struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
+    comptime block_size = 64
+    comptime digest_size = 32
+
+    var _h: InlineArray[UInt32, 8]
     var _buffer: InlineArray[UInt8, 64]
     var _buffer_len: Int
     var _bit_length: UInt64
 
     def __init__(out self):
-        self._h0 = 0x6A09E667
-        self._h1 = 0xBB67AE85
-        self._h2 = 0x3C6EF372
-        self._h3 = 0xA54FF53A
-        self._h4 = 0x510E527F
-        self._h5 = 0x9B05688C
-        self._h6 = 0x1F83D9AB
-        self._h7 = 0x5BE0CD19
+        self._h = [
+            0x6A09E667,
+            0xBB67AE85,
+            0x3C6EF372,
+            0xA54FF53A,
+            0x510E527F,
+            0x9B05688C,
+            0x1F83D9AB,
+            0x5BE0CD19,
+        ]
         self._buffer = InlineArray[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
@@ -152,14 +151,14 @@ struct SHA256(Defaultable, Hasher):
         self._process_words(_message_schedule(block))
 
     def _process_words(mut self, words: InlineArray[UInt32, 64]):
-        var a = self._h0
-        var b = self._h1
-        var c = self._h2
-        var d = self._h3
-        var e = self._h4
-        var f = self._h5
-        var g = self._h6
-        var h = self._h7
+        var a = self._h[0]
+        var b = self._h[1]
+        var c = self._h[2]
+        var d = self._h[3]
+        var e = self._h[4]
+        var f = self._h[5]
+        var g = self._h[6]
+        var h = self._h[7]
         comptime for i in range(64):
             var choice = (e & f) ^ ((~e) & g)
             var majority = (a & b) ^ (a & c) ^ (b & c)
@@ -176,14 +175,14 @@ struct SHA256(Defaultable, Hasher):
             b = a
             a = temp1 + temp2
 
-        self._h0 += a
-        self._h1 += b
-        self._h2 += c
-        self._h3 += d
-        self._h4 += e
-        self._h5 += f
-        self._h6 += g
-        self._h7 += h
+        self._h[0] += a
+        self._h[1] += b
+        self._h[2] += c
+        self._h[3] += d
+        self._h[4] += e
+        self._h[5] += f
+        self._h[6] += g
+        self._h[7] += h
 
     def _process_buffer(mut self):
         var words = _message_schedule(Span(self._buffer))
@@ -236,14 +235,8 @@ struct SHA256(Defaultable, Hasher):
     def digest(var self) -> List[UInt8]:
         self._finalize()
         var output = List[UInt8](capacity=32)
-        append_be_u32(output, self._h0)
-        append_be_u32(output, self._h1)
-        append_be_u32(output, self._h2)
-        append_be_u32(output, self._h3)
-        append_be_u32(output, self._h4)
-        append_be_u32(output, self._h5)
-        append_be_u32(output, self._h6)
-        append_be_u32(output, self._h7)
+        for i in range(8):
+            append_be_u32(output, self._h[i])
         return output^
 
     def hexdigest(var self) -> String:
@@ -251,6 +244,6 @@ struct SHA256(Defaultable, Hasher):
 
     def finish(var self) -> UInt64:
         self._finalize()
-        return (self._h0.cast[DType.uint64]() << UInt64(32)) | self._h1.cast[
-            DType.uint64
-        ]()
+        return (self._h[0].cast[DType.uint64]() << UInt64(32)) | self._h[
+            1
+        ].cast[DType.uint64]()
