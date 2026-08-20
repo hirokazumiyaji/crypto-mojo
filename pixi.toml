@@ -5,6 +5,20 @@ platforms = ["osx-arm64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
+format = "mojo format src/crypto/*.mojo tests/*.mojo conda.recipe/test.mojo"
+test-md5 = "mojo run -I src tests/md5_test.mojo"
+test-sha256 = "mojo run -I src tests/sha256_test.mojo"
+test-sha512 = "mojo run -I src tests/sha512_test.mojo"
+test-sha3 = "mojo run -I src tests/sha3_test.mojo"
+test-blake2b = "mojo run -I src tests/blake2b_test.mojo"
+test-blake3 = "mojo run -I src tests/blake3_test.mojo"
+test-subtle = "mojo run -I src tests/subtle_test.mojo"
+test-hmac = "mojo run -I src tests/hmac_test.mojo"
+test-hkdf = "mojo run -I src tests/hkdf_test.mojo"
+test-pbkdf2 = "mojo run -I src tests/pbkdf2_test.mojo"
+test = { depends-on = ["test-md5", "test-sha256", "test-sha512", "test-sha3", "test-blake2b", "test-blake3", "test-subtle", "test-hmac", "test-hkdf", "test-pbkdf2"] }
+precompile = "mojo precompile src/crypto -o /tmp/crypto.mojoc"
+test-consumer = { cmd = "mojo run -I /tmp conda.recipe/test.mojo", depends-on = ["precompile"] }
 
 [dependencies]
 mojo = ">=1.0.0,<2"

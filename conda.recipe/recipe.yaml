@@ -1,0 +1,36 @@
+context:
+  name: crypto
+  version: "0.1.0"
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  script:
+    - mojo precompile src/crypto -o ${{ PREFIX }}/lib/mojo/crypto.mojoc
+
+requirements:
+  build:
+    - mojo-compiler =1.0.0
+  host:
+    - mojo-compiler =1.0.0
+  run:
+    - ${{ pin_compatible('mojo-compiler') }}
+
+tests:
+  - script:
+      - mojo run test.mojo
+    files:
+      recipe:
+        - test.mojo
+
+about:
+  homepage: https://github.com/hirokazumiyaji/crypto-mojo
+  repository: https://github.com/hirokazumiyaji/crypto-mojo
+  summary: Pure Mojo cryptographic primitives
+  description: Pure Mojo implementations of hashes, HMAC, HKDF, PBKDF2, and constant-time byte comparison.
