@@ -1,33 +1,35 @@
-# Pure Mojo `crypto`パッケージ設計
+# Pure Mojo `crypto` package design
 
-## 目的
+English | [日本語](crypto-design.ja.md)
 
-このマイルストーンでは、Pure Mojoの暗号ライブラリに必要なハッシュ、定数時間比較、メッセージ認証、鍵導出を実装する。
-Goの`crypto`パッケージ群を構成の参考にするが、公開APIにはMojoの型、所有権、エラー処理を用いる。
+## Goals
 
-ライブラリ本体はMojo標準ライブラリだけに依存する。
-FFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
+This milestone implements the hashing, constant-time comparison, message authentication, and key derivation needed for a Pure Mojo cryptography library.
+Go's `crypto` packages inform the structure, but the public API uses Mojo types, ownership, and error handling.
 
-このマイルストーンは実験的リリースとして扱う。
-テストベクトルと独立実装による照合は行うが、外部のセキュリティ監査を受けた実装とは表明しない。
+The library depends only on the Mojo standard library.
+It does not depend on FFI, Python, OpenSSL, or the existing `hash` package.
 
-## 長期的な範囲
+Treat this milestone as an experimental release.
+We verify against test vectors and independent implementations, but we do not claim an externally audited implementation.
 
-プロジェクトはGoの`crypto`と`x/crypto`に相当する機能を段階的に追加する。
-各段階は独立した仕様と実装計画を持つ。
+## Long-term scope
 
-1. ハッシュ、HMAC、HKDF、PBKDF2、定数時間比較
-2. ChaCha20、Poly1305、ChaCha20-Poly1305、XChaCha20-Poly1305
-3. AES、AES-CTR、AES-GCM
-4. Curve25519、Ed25519
-5. Argon2、scrypt、bcrypt
-6. SSHなどの暗号プロトコル
+The project will add functionality comparable to Go's `crypto` and `x/crypto` in stages.
+Each stage has its own specification and implementation plan.
 
-この仕様が対象とするのは第1段階だけである。
+1. Hashing, HMAC, HKDF, PBKDF2, constant-time comparison
+2. ChaCha20, Poly1305, ChaCha20-Poly1305, XChaCha20-Poly1305
+3. AES, AES-CTR, AES-GCM
+4. Curve25519, Ed25519
+5. Argon2, scrypt, bcrypt
+6. Cryptographic protocols such as SSH
 
-## パッケージ構成
+This specification covers only stage 1.
 
-公開パッケージを次のモジュールに分割する。
+## Package layout
+
+Split the public package into these modules:
 
 ```text
 crypto
@@ -43,29 +45,29 @@ crypto
 └── pbkdf2
 ```
 
-`crypto.md5`は`MD5`を公開する。
-`crypto.sha256`は`SHA256`を公開する。
-`crypto.sha512`は`SHA384`と`SHA512`を公開する。
-`crypto.sha3`は`SHA3_256`を公開する。
-`crypto.blake2b`は`BLAKE2b`を公開する。
-`crypto.blake3`は`BLAKE3`を公開する。
+`crypto.md5` exports `MD5`.
+`crypto.sha256` exports `SHA256`.
+`crypto.sha512` exports `SHA384` and `SHA512`.
+`crypto.sha3` exports `SHA3_256`.
+`crypto.blake2b` exports `BLAKE2b`.
+`crypto.blake3` exports `BLAKE3`.
 
-`BLAKE2b`の`digest_size`は1 byte以上64 byte以下とする。
-`BLAKE3`のkeyed modeは32-byte鍵だけを受け入れる。
-`BLAKE3`の`digest_xof`と`hexdigest_xof`は0以上の出力長を受け入れる。
+`BLAKE2b` `digest_size` is from 1 byte through 64 bytes inclusive.
+`BLAKE3` keyed mode accepts only a 32-byte key.
+`BLAKE3` `digest_xof` and `hexdigest_xof` accept an output length of 0 or greater.
 
-これらの実装は既存の`hash-mojo`から移し、`crypto`パッケージの実体とする。
-各ハッシュ型はMojo標準の`std.hashlib.Hasher` traitに準拠し続ける。
-`crypto.__init__`はサブモジュールの型や関数を一括で再公開しない。
+Move these implementations from the existing `hash-mojo` project and make them the body of the `crypto` package.
+Each hash type continues to conform to Mojo's standard `std.hashlib.Hasher` trait.
+`crypto.__init__` does not re-export submodule types or functions in bulk.
 
-HMAC、HKDF、PBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
-MD5は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
+HMAC, HKDF, and PBKDF2 officially support only SHA-256, SHA-384, and SHA-512.
+Document that MD5 is for compatibility with existing data only and must not be used for new security purposes.
 
-## 公開API
+## Public API
 
 ### HMAC
 
-`crypto.hmac`は次の具象型を公開する。
+`crypto.hmac` exports these concrete types:
 
 ```mojo
 HMAC_SHA256(key: Span[Byte, _])
@@ -73,7 +75,7 @@ HMAC_SHA384(key: Span[Byte, _])
 HMAC_SHA512(key: Span[Byte, _])
 ```
 
-各型は次の操作を持つ。
+Each type provides these operations:
 
 ```mojo
 update_bytes(mut self, data: Span[Byte, _])
@@ -82,10 +84,10 @@ hexdigest(var self) -> String
 verify(var self, expected: Span[Byte, _]) -> Bool
 ```
 
-`digest`、`hexdigest`、`verify`はHMACの状態を消費する。
-状態の`reset`とコピーは公開しない。
+`digest`, `hexdigest`, and `verify` consume the HMAC state.
+Do not expose state `reset` or copying.
 
-短い入力向けに次のワンショット関数を公開する。
+For short inputs, export these one-shot functions:
 
 ```mojo
 hmac_sha256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
@@ -93,14 +95,14 @@ hmac_sha384(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 hmac_sha512(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]
 ```
 
-HMAC型は標準`Hasher` traitに準拠しない。
-標準`Hasher`は引数なしの初期化と64-bitの`finish`を要求するため、鍵を必須とし完全長のMACを返すHMACの契約を表現できない。
+HMAC types do not conform to the standard `Hasher` trait.
+The standard `Hasher` requires argument-free initialization and a 64-bit `finish`, so it cannot express HMAC's contract of a required key and a full-length MAC.
 
 ### HKDF
 
-`crypto.hkdf`は各SHA-2方式に`extract`、`expand`、`derive`を公開する。
-SHA-256版のシグネチャを次に示す。
-SHA-384版とSHA-512版は名前の接尾辞だけが異なる。
+`crypto.hkdf` exports `extract`, `expand`, and `derive` for each SHA-2 variant.
+The SHA-256 signatures are shown below.
+The SHA-384 and SHA-512 variants differ only in the name suffix.
 
 ```mojo
 extract_sha256(
@@ -122,13 +124,13 @@ derive_sha256(
 ) raises -> List[UInt8]
 ```
 
-初期リリースは要求された長さを一度に返す。
-段階的に読み出すreader型は含めない。
+The initial release returns the requested length in one shot.
+Do not include a reader type for incremental output.
 
 ### PBKDF2
 
-`crypto.pbkdf2`は各SHA-2方式に`derive`を公開する。
-SHA-256版のシグネチャを次に示す。
+`crypto.pbkdf2` exports `derive` for each SHA-2 variant.
+The SHA-256 signature is shown below.
 
 ```mojo
 derive_sha256(
@@ -139,11 +141,11 @@ derive_sha256(
 ) raises -> List[UInt8]
 ```
 
-SHA-384版とSHA-512版は名前の接尾辞だけが異なる。
+The SHA-384 and SHA-512 variants differ only in the name suffix.
 
-### 定数時間比較
+### Constant-time comparison
 
-`crypto.subtle`は次の関数を公開する。
+`crypto.subtle` exports:
 
 ```mojo
 constant_time_compare(
@@ -152,118 +154,118 @@ constant_time_compare(
 ) -> Bool
 ```
 
-このマイルストーンで使わないselect、copy、整数比較は追加しない。
+Do not add select, copy, or integer comparison helpers unused in this milestone.
 
-## データと所有権
+## Data and ownership
 
-公開APIのバイト入力は借用した`Span[Byte, _]`で受け取る。
-可変長の生成結果は所有された`List[UInt8]`で返す。
+Public API byte inputs are borrowed `Span[Byte, _]`.
+Variable-length outputs are owned `List[UInt8]`.
 
-ストリーミングHMACは入力を内部のハッシュ状態へ逐次反映する。
-確定処理は内部状態を消費するため、確定後の再利用や暗黙の状態コピーは起こらない。
+Streaming HMAC folds input into internal hash state incrementally.
+Finalization consumes that state, so reuse or implicit state copies after finalization do not occur.
 
-HMACの初期化は鍵をハッシュのブロック長へ正規化し、inner padとouter padをそれぞれのハッシュ状態へ取り込む。
-初期化後の構造体は生の鍵を保持しない。
+HMAC initialization normalizes the key to the hash block size and absorbs the inner and outer pads into separate hash states.
+After initialization, the struct does not retain the raw key.
 
-## 暗号処理
+## Cryptographic processing
 
-HMACはRFC 2104に従う。
-SHA-256のブロック長は64 byte、SHA-384とSHA-512のブロック長は128 byteとする。
-ブロック長を超える鍵は同じハッシュで短縮し、短い鍵はゼロで補う。
-空の鍵は仕様上の有効な入力として受け入れる。
+HMAC follows RFC 2104.
+SHA-256 uses a 64-byte block size; SHA-384 and SHA-512 use a 128-byte block size.
+Keys longer than the block size are shortened with the same hash; shorter keys are zero-padded.
+Empty keys are accepted as valid inputs per the specification.
 
-HKDFはRFC 5869に従う。
-空のsaltはダイジェスト長と同じ長さのゼロ列として扱う。
-`expand`と`derive`は`255 * digest_length` byteまで出力できる。
+HKDF follows RFC 5869.
+An empty salt is treated as a zero string of digest length.
+`expand` and `derive` may produce up to `255 * digest_length` bytes.
 
-PBKDF2-HMACはRFC 8018に従う。
-ブロック番号は1から始まる32-bitのbig-endian整数としてHMAC入力へ追加する。
-反復回数に恣意的な上限は設けない。
+PBKDF2-HMAC follows RFC 8018.
+Block numbers are appended to the HMAC input as 32-bit big-endian integers starting at 1.
+Do not impose an arbitrary iteration-count ceiling.
 
-## エラー処理
+## Error handling
 
-BLAKE2bは範囲外の`digest_size`を`Error`としてraiseする。
-BLAKE3は32 byteではない鍵と負のXOF出力長を`Error`としてraiseする。
-XOF出力長0は空のダイジェストまたは空文字列を返す。
+BLAKE2b raises `Error` for out-of-range `digest_size`.
+BLAKE3 raises `Error` for keys that are not 32 bytes and for negative XOF output lengths.
+An XOF output length of 0 returns an empty digest or empty string.
 
-HMACの初期化、更新、確定は通常の入力でraiseしない。
-MACの長さが異なる比較は`False`を返す。
+HMAC initialization, update, and finalization do not raise for ordinary inputs.
+MAC comparisons with mismatched lengths return `False`.
 
-HKDFは負の出力長と`255 * digest_length` byteを超える出力長を`Error`としてraiseする。
-出力長0は空の`List[UInt8]`を返す。
+HKDF raises `Error` for negative output lengths and for lengths greater than `255 * digest_length` bytes.
+An output length of 0 returns an empty `List[UInt8]`.
 
-PBKDF2は0以下の反復回数、負の出力長、32-bitのブロック番号で表現できない出力長を`Error`としてraiseする。
-出力長0は空の`List[UInt8]`を返す。
+PBKDF2 raises `Error` for non-positive iteration counts, negative output lengths, and output lengths that cannot be expressed with 32-bit block numbers.
+An output length of 0 returns an empty `List[UInt8]`.
 
-独自のエラー型と、同じ失敗に対する複数のフォールバック経路は設けない。
+Do not introduce custom error types or multiple fallback paths for the same failure.
 
-## セキュリティ境界
+## Security boundaries
 
-`constant_time_compare`は長さが同じ場合に全バイトのXOR結果を集約し、バイト値に依存する分岐を行わない。
-長さが異なる場合は直ちに`False`を返す。
+`constant_time_compare` aggregates XOR differences across all bytes when lengths match and does not branch on byte values.
+When lengths differ, it returns `False` immediately.
 
-この性質はソースコード上のbest effortであり、コンパイラとCPUを含む厳密な実行時間を保証しない。
-ライブラリは秘密値の確実なゼロ化も保証しない。
-現在のMojoでは、最適化後に消去処理が残ることをAPIから保証できないためである。
+This property is best-effort at the source level and does not guarantee strict timing across the compiler and CPU.
+The library also does not guarantee reliable zeroization of secret values.
+Current Mojo cannot guarantee from the API that wipe operations survive optimization.
 
-実装は秘密値の不要なコピーを避ける。
-ただし、コピーの回避を秘密値消去の保証として説明しない。
+Implementations avoid unnecessary copies of secret values.
+Do not describe copy avoidance as a guarantee of secret zeroization.
 
-Mojo標準の`std.random`は暗号学的に安全ではないため使用しない。
-暗号学的乱数生成はこのマイルストーンの範囲外とする。
+Do not use Mojo's standard `std.random`; it is not cryptographically secure.
+Cryptographic random number generation is out of scope for this milestone.
 
-## テスト
+## Testing
 
-ハッシュには既存の`hash-mojo`テストを移植する。
-対象はMD5、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3である。
+Port the existing `hash-mojo` tests for hashing.
+Cover MD5, SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3.
 
-HMACはRFC 4231のSHA-256、SHA-384、SHA-512テストベクトルで検証する。
-一つの入力を一度に渡した結果と複数回の`update_bytes`で渡した結果が一致することも検証する。
-空入力、ブロック長より長い鍵、MACの一致、不一致、長さ違いを含める。
+Verify HMAC against RFC 4231 test vectors for SHA-256, SHA-384, and SHA-512.
+Also verify that passing one input at once matches results from multiple `update_bytes` calls.
+Include empty inputs, keys longer than the block size, matching MACs, mismatched MACs, and length mismatches.
 
-HKDF-SHA-256はRFC 5869のテストベクトルで検証する。
-SHA-384版とSHA-512版はGoの独立実装と事前に照合した固定ベクトルで検証する。
-長さ0、最大長、最大長超過も検証する。
+Verify HKDF-SHA-256 against RFC 5869 test vectors.
+Verify SHA-384 and SHA-512 with fixed vectors previously checked against an independent Go implementation.
+Also cover length 0, maximum length, and over-maximum length.
 
-PBKDF2-HMAC-SHA-2はRFC 7914のベクトルとGoの独立実装に照合した固定ベクトルで検証する。
-反復回数1、複数ブロック出力、長さ0、不正な反復回数を含める。
+Verify PBKDF2-HMAC-SHA-2 against RFC 7914 vectors and fixed vectors checked against an independent Go implementation.
+Include one iteration, multi-block output, length 0, and invalid iteration counts.
 
-固定ベクトルはMojoテストへ埋め込む。
-テスト実行時にGo、Python、OpenSSLを呼び出さない。
+Embed fixed vectors in the Mojo tests.
+Do not call Go, Python, or OpenSSL at test time.
 
-各テストファイルは`std.testing.TestSuite.discover_tests`を使い、`mojo run`で実行する。
-precompileした`crypto.mojoc`だけをimportするconsumer testも用意する。
+Each test file uses `std.testing.TestSuite.discover_tests` and runs with `mojo run`.
+Also provide a consumer test that imports only the precompiled `crypto.mojoc`.
 
-## CIと配布
+## CI and distribution
 
-PixiはMojo 1.0系を管理し、標準ライブラリ以外のライブラリ依存を追加しない。
-対象プラットフォームはLinux x86-64とmacOS arm64とする。
+Pixi manages Mojo 1.0 and adds no library dependencies beyond the standard library.
+Target platforms are Linux x86-64 and macOS arm64.
 
-CIは次の処理を実行する。
+CI runs:
 
-1. Mojoソースとテストのformat確認
-2. 全テストの実行
-3. `crypto`パッケージのprecompile
-4. precompile済みパッケージを使うconsumer test
+1. Format checks for Mojo sources and tests
+2. The full test suite
+3. Precompilation of the `crypto` package
+4. A consumer test against the precompiled package
 
-`conda.recipe`は`crypto`というパッケージ名で`crypto.mojoc`を生成する。
-配布先はprefix.devの個人channelを想定する。
+`conda.recipe` produces `crypto.mojoc` under the package name `crypto`.
+Distribution is intended for a personal prefix.dev channel.
 
-READMEは公開API、実行方法、配布方法、実験的リリースであることを説明する。
-READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監査の各境界を明記する。
+The README documents the public API, how to run and distribute the package, and that the release is experimental.
+It also states the boundaries for MD5 use, constant-time execution, secret zeroization, and external audit status.
 
-## 対象外
+## Out of scope
 
-次の項目はこのマイルストーンに含めない。
+This milestone does not include:
 
-- SHA-224とSHA-1
-- HMAC-SHA3とHMAC-BLAKE
-- HKDFのreader API
-- 状態のreset、clone、serialize
-- 暗号学的乱数生成
-- FIPS 140への準拠表明
-- SIMDまたはアセンブリによる最適化
-- ベンチマーク上の性能目標
-- prefix.dev上の既存`hash`パッケージの削除操作
+- SHA-224 and SHA-1
+- HMAC-SHA3 and HMAC-BLAKE
+- An HKDF reader API
+- State reset, clone, or serialize
+- Cryptographic random number generation
+- FIPS 140 compliance claims
+- SIMD or assembly optimization
+- Benchmark performance targets
+- Deleting the existing `hash` package on prefix.dev
 
-既存`hash`パッケージの削除は、`crypto`パッケージのテスト、precompile、配布確認が完了した後に別作業として行う。
+Deleting the existing `hash` package is a separate task after `crypto` package tests, precompilation, and distribution checks are complete.
