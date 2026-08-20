@@ -1,0 +1,72 @@
+from crypto._common import HashFunction, bytes_to_hex
+from crypto.sha256 import SHA256
+from crypto.sha512 import SHA384, SHA512
+from crypto.subtle import constant_time_compare
+from std.collections import List, Span
+
+
+struct HMAC[H: HashFunction](Copyable, Movable):
+    var _inner: Self.H
+    var _outer: Self.H
+
+    def __init__(out self, key: Span[Byte, _]):
+        var block = InlineArray[UInt8, Self.H.block_size](fill=0)
+        if len(key) > Self.H.block_size:
+            var hasher = Self.H()
+            hasher.update_bytes(key)
+            var digest = hasher^.digest()
+            for i in range(len(digest)):
+                block[i] = digest[i]
+        else:
+            for i in range(len(key)):
+                block[i] = key[i]
+        for i in range(Self.H.block_size):
+            block[i] ^= 0x36
+        self._inner = Self.H()
+        self._inner.update_bytes(Span(block))
+        for i in range(Self.H.block_size):
+            block[i] ^= 0x36 ^ 0x5C
+        self._outer = Self.H()
+        self._outer.update_bytes(Span(block))
+
+    def update_bytes(mut self, data: Span[Byte, _]):
+        self._inner.update_bytes(data)
+
+    def digest(deinit self) -> List[UInt8]:
+        var inner = self._inner^
+        var outer = self._outer^
+        var inner_digest = inner^.digest()
+        outer.update_bytes(inner_digest[:])
+        return outer^.digest()
+
+    def hexdigest(deinit self) -> String:
+        return bytes_to_hex(self^.digest())
+
+    def verify(deinit self, expected: Span[Byte, _]) -> Bool:
+        var actual = self^.digest()
+        return constant_time_compare(actual[:], expected)
+
+
+comptime HMAC_SHA256 = HMAC[SHA256]
+comptime HMAC_SHA384 = HMAC[SHA384]
+comptime HMAC_SHA512 = HMAC[SHA512]
+
+
+def hmac[
+    H: HashFunction
+](key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    var mac = HMAC[H](key)
+    mac.update_bytes(data)
+    return mac^.digest()
+
+
+def hmac_sha256(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    return hmac[SHA256](key, data)
+
+
+def hmac_sha384(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    return hmac[SHA384](key, data)
+
+
+def hmac_sha512(key: Span[Byte, _], data: Span[Byte, _]) -> List[UInt8]:
+    return hmac[SHA512](key, data)

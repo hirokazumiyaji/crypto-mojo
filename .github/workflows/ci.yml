@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-14
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install locked toolchain
+        uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
+        with:
+          pixi-version: v0.77.0
+          cache: true
+          locked: true
+
+      - name: Check Mojo formatting
+        run: |
+          pixi run format
+          git diff --exit-code -- src/crypto tests conda.recipe/test.mojo
+
+      - name: Run tests
+        run: pixi run test
+
+      - name: Precompile and test package
+        run: pixi run test-consumer
