@@ -11,6 +11,8 @@ from std.collections import List, Span
 struct HMAC[H: HashFunction](Copyable, Movable):
     var _inner: Self.H
     var _outer: Self.H
+    var _inner_init: Self.H
+    var _outer_init: Self.H
 
     def __init__(out self, key: Span[Byte, _]):
         var block = InlineArray[UInt8, Self.H.block_size](fill=0)
@@ -31,9 +33,18 @@ struct HMAC[H: HashFunction](Copyable, Movable):
             block[i] ^= 0x36 ^ 0x5C
         self._outer = Self.H()
         self._outer.update_bytes(Span(block))
+        self._inner_init = self._inner.copy()
+        self._outer_init = self._outer.copy()
 
     def update_bytes(mut self, data: Span[Byte, _]):
         self._inner.update_bytes(data)
+
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._inner = self._inner_init.copy()
+        self._outer = self._outer_init.copy()
 
     def digest(deinit self) -> List[UInt8]:
         var inner = self._inner^

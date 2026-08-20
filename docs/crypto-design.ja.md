@@ -62,6 +62,10 @@ crypto
 各ハッシュ型はMojo標準の`std.hashlib.Hasher` traitに準拠し続ける。
 `crypto.__init__`はサブモジュールの型や関数を一括で再公開しない。
 
+公開ハッシュ型はすべて`clone(self) -> Self`と`reset(mut self)`を提供する。
+`clone`は現在の中間状態を独立に複製したものを返す。
+`reset`はその値の`__init__`直後の状態へ戻す。unkeyedなハッシュは空の状態へ戻り、`BLAKE2b`は設定済みの`digest_size`を維持し、keyedな`BLAKE3`は鍵を維持する(内部に保持済みの鍵ワードから再構築するため、呼び出し側が鍵を再指定する必要はない)。`digest`、`hexdigest`、`finish`は引き続き値を消費し、消費後の値に`reset`は使えない。
+
 HMACは汎用の`HMAC[H: HashFunction]`に加えて、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3を正式にサポートする。
 HKDFとPBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
 MD5とSHA-1は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
@@ -90,10 +94,13 @@ update_bytes(mut self, data: Span[Byte, _])
 digest(var self) -> List[UInt8]
 hexdigest(var self) -> String
 verify(var self, expected: Span[Byte, _]) -> Bool
+clone(self) -> Self
+reset(mut self)
 ```
 
 `digest`、`hexdigest`、`verify`はHMACの状態を消費する。
-状態の`reset`とコピーは公開しない。
+`clone`は現在のストリーミング状態を独立に複製したものを返す。
+`reset`は`__init__`終了時点で取得したinner/outerのハッシュ状態へ復元するため、生の鍵を保持したり再導出したりせずに同じ鍵で新しいメッセージを開始できる。`digest`/`hexdigest`/`verify`で値を消費した後は`reset`を使えない。
 
 短い入力向けに次のワンショット関数を公開する。
 
@@ -258,6 +265,8 @@ SHA-384版とSHA-512版はGoの独立実装と事前に照合した固定ベク�
 
 HKDF readerについては、`read`が同じ合計長の`expand`と一致すること、ブロック境界をまたぐ複数回の`read`を連結した結果が単一の`expand`呼び出しと一致すること、`clone`が元のreaderと独立に分岐すること、`reset`が元の実行と同じbyte列を再生すること、最大長を超える読み出しが例外を発生させることを検証する。
 
+公開ハッシュ型とHMACの各エイリアスについて、`update` → `clone` → 片方だけ追加更新すると異なるダイジェストになること、`update` → `reset` → 同じ入力を再投入すると新規に構築したハッシャーやHMACと一致することを検証する。HMACでは特に、鍵を再指定せずに`reset`後に投入したMACが同じ鍵とメッセージのワンショット関数と一致すること(鍵情報が保持されること)を検証する。
+
 PBKDF2-HMAC-SHA-2はRFC 7914のベクトルとGoの独立実装に照合した固定ベクトルで検証する。
 反復回数1、複数ブロック出力、長さ0、不正な反復回数を含める。
 
@@ -289,7 +298,7 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 
 次の項目はこのマイルストーンに含めない。
 
-- 状態のreset、clone、serialize
+- ハッシュ、HMAC、HKDF readerの状態のserialize/deserialize
 - 暗号学的乱数生成
 - FIPS 140への準拠表明
 - SIMDまたはアセンブリによる最適化

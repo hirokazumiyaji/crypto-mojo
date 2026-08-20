@@ -115,6 +115,21 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
 
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._h = [
+            0x67452301,
+            0xEFCDAB89,
+            0x98BADCFE,
+            0x10325476,
+            0xC3D2E1F0,
+        ]
+        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer_len = 0
+        self._bit_length = 0
+
     def _finalize(mut self):
         var original_length = self._bit_length
         self._buffer[self._buffer_len] = 0x80

@@ -220,6 +220,12 @@ struct BLAKE2b(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
 
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._core = _BLAKE2bCore(self._core._digest_size)
+
     def digest(var self) -> List[UInt8]:
         return self._core.digest()
 

@@ -136,6 +136,14 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
 
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._state = InlineArray[UInt64, 25](fill=0)
+        self._buffer = InlineArray[UInt8, 136](fill=0)
+        self._buffer_len = 0
+
     def _finalize(mut self):
         self._buffer[self._buffer_len] = 0x06
         self._buffer_len += 1

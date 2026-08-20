@@ -62,6 +62,10 @@ Move these implementations from the existing `hash-mojo` project and make them t
 Each hash type continues to conform to Mojo's standard `std.hashlib.Hasher` trait.
 `crypto.__init__` does not re-export submodule types or functions in bulk.
 
+Every public hash type also provides `clone(self) -> Self` and `reset(mut self)`.
+`clone` returns an independent copy of the current intermediate state.
+`reset` restores the instance to its post-`__init__` state for that value: an unkeyed hash returns to its empty state, `BLAKE2b` keeps its configured `digest_size`, and keyed `BLAKE3` keeps its key (re-derived from the key words already held internally, so callers do not re-supply the key). `digest`, `hexdigest`, and `finish` remain consuming; `reset` is not available after consumption.
+
 HMAC officially supports SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3, in addition to the generic `HMAC[H: HashFunction]`.
 HKDF and PBKDF2 officially support only SHA-256, SHA-384, and SHA-512.
 Document that MD5 and SHA-1 are for compatibility with existing data only and must not be used for new security purposes.
@@ -90,10 +94,13 @@ update_bytes(mut self, data: Span[Byte, _])
 digest(var self) -> List[UInt8]
 hexdigest(var self) -> String
 verify(var self, expected: Span[Byte, _]) -> Bool
+clone(self) -> Self
+reset(mut self)
 ```
 
 `digest`, `hexdigest`, and `verify` consume the HMAC state.
-Do not expose state `reset` or copying.
+`clone` returns an independent copy of the current streaming state.
+`reset` restores the keyed inner/outer hash state captured at the end of `__init__`, so a caller can start a new message with the same key without storing or re-deriving the raw key. `reset` is not available after `digest` / `hexdigest` / `verify` have consumed the value.
 
 For short inputs, export these one-shot functions:
 
@@ -258,6 +265,8 @@ Also cover length 0, maximum length, and over-maximum length.
 
 Verify that the HKDF reader's `read` matches `expand` for an equal total length, that sequential reads across block boundaries concatenate to the same bytes as a single `expand` call, that `clone` diverges independently from the original reader, that `reset` replays the same bytes as the original run, and that reading past the maximum length raises.
 
+For each public hash type and HMAC alias, verify that `update` → `clone` → further diverging updates produce different digests, and that `update` → `reset` → re-feeding the same input matches a freshly constructed hasher or HMAC. For HMAC specifically, verify that `reset` preserves keying (a reset-then-fed MAC matches the one-shot function for the same key and message) without needing to re-supply the key.
+
 Verify PBKDF2-HMAC-SHA-2 against RFC 7914 vectors and fixed vectors checked against an independent Go implementation.
 Include one iteration, multi-block output, length 0, and invalid iteration counts.
 
@@ -289,7 +298,7 @@ It also states the boundaries for MD5 use, constant-time execution, secret zeroi
 
 This milestone does not include:
 
-- State reset, clone, or serialize
+- Serialize/deserialize of hash, HMAC, or HKDF reader state
 - Cryptographic random number generation
 - FIPS 140 compliance claims
 - SIMD or assembly optimization

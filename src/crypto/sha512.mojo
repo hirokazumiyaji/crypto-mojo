@@ -289,6 +289,23 @@ struct SHA512(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
 
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._core = _SHA512Core(
+            [
+                0x6A09E667F3BCC908,
+                0xBB67AE8584CAA73B,
+                0x3C6EF372FE94F82B,
+                0xA54FF53A5F1D36F1,
+                0x510E527FADE682D1,
+                0x9B05688C2B3E6C1F,
+                0x1F83D9ABFB41BD6B,
+                0x5BE0CD19137E2179,
+            ]
+        )
+
     def digest(var self) -> List[UInt8]:
         return self._core.digest()
 
@@ -330,6 +347,23 @@ struct SHA384(Copyable, Defaultable, HashFunction, Hasher, Movable):
 
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
+
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._core = _SHA512Core(
+            [
+                0xCBBB9D5DC1059ED8,
+                0x629A292A367CD507,
+                0x9159015A3070DD17,
+                0x152FECD8F70E5939,
+                0x67332667FFC00B31,
+                0x8EB44A8768581511,
+                0xDB0C2E0D64F98FA7,
+                0x47B5481DBEFA4FA4,
+            ]
+        )
 
     def digest(var self) -> List[UInt8]:
         var full = self._core.digest()

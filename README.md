@@ -32,6 +32,9 @@ print(sha256^.hexdigest())
 Use MD5 and SHA-1 only to check compatibility with existing data or legacy formats.
 Neither is suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
 
+Every hash type also provides `clone()` and `reset()`.
+`clone()` returns an independent copy of the current state; `reset()` returns the instance to its post-construction state (preserving `BLAKE2b`'s `digest_size` and `BLAKE3`'s key, if any). `digest()`, `hexdigest()`, and `finish()` remain consuming, so call `clone()` first if you need both a digest and a continued stream.
+
 HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3.
 
 ```mojo
@@ -47,6 +50,9 @@ var one_shot_tag = hmac_sha256(key, "message".as_bytes())
 
 `HMAC_SHA3_256` / `hmac_sha3_256`, `HMAC_BLAKE2b` / `hmac_blake2b`, and `HMAC_BLAKE3` / `hmac_blake3` follow the same shape.
 `HMAC_BLAKE2b` fixes the digest size at 64 bytes; `HMAC_BLAKE3` uses BLAKE3's default unkeyed mode with a 32-byte digest, distinct from BLAKE3's own keyed-hash feature.
+
+Every HMAC type also provides `clone()` and `reset()`.
+`reset()` restores the keyed inner/outer state captured when the HMAC was constructed, so you can authenticate a new message with the same key without storing or re-deriving the raw key. `digest()`, `hexdigest()`, and `verify()` still consume the value; `reset()` is unavailable afterward.
 
 HKDF and PBKDF2 expose concrete functions for SHA-256, SHA-384, and SHA-512.
 

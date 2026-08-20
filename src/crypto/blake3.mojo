@@ -439,6 +439,14 @@ struct BLAKE3(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
 
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        var key_words = self._core._key_words.copy()
+        var flags = self._core._flags
+        self._core = _BLAKE3Core(key_words, flags)
+
     def digest(var self) -> List[UInt8]:
         return self._core.digest()
 

@@ -263,6 +263,23 @@ struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
 
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._core = _SHA256Core(
+            [
+                0x6A09E667,
+                0xBB67AE85,
+                0x3C6EF372,
+                0xA54FF53A,
+                0x510E527F,
+                0x9B05688C,
+                0x1F83D9AB,
+                0x5BE0CD19,
+            ]
+        )
+
     def digest(var self) -> List[UInt8]:
         return self._core.digest()
 
@@ -304,6 +321,23 @@ struct SHA224(Copyable, Defaultable, HashFunction, Hasher, Movable):
 
     def update(mut self, value: Some[Hashable]):
         value.__hash__(self)
+
+    def clone(self) -> Self:
+        return self.copy()
+
+    def reset(mut self):
+        self._core = _SHA256Core(
+            [
+                0xC1059ED8,
+                0x367CD507,
+                0x3070DD17,
+                0xF70E5939,
+                0xFFC00B31,
+                0x68581511,
+                0x64F98FA7,
+                0xBEFA4FA4,
+            ]
+        )
 
     def digest(var self) -> List[UInt8]:
         var full = self._core.digest()
