@@ -123,26 +123,14 @@ def _message_schedule(block: Span[Byte, _]) -> InlineArray[UInt32, 64]:
     return words^
 
 
-struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
-    comptime block_size = 64
-    comptime digest_size = 32
-
+struct _SHA256Core(Copyable, Movable):
     var _h: InlineArray[UInt32, 8]
     var _buffer: InlineArray[UInt8, 64]
     var _buffer_len: Int
     var _bit_length: UInt64
 
-    def __init__(out self):
-        self._h = [
-            0x6A09E667,
-            0xBB67AE85,
-            0x3C6EF372,
-            0xA54FF53A,
-            0x510E527F,
-            0x9B05688C,
-            0x1F83D9AB,
-            0x5BE0CD19,
-        ]
+    def __init__(out self, var initial_h: InlineArray[UInt32, 8]):
+        self._h = initial_h^
         self._buffer = InlineArray[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
@@ -208,15 +196,9 @@ struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
             self._buffer[self._buffer_len] = data[i]
             self._buffer_len += 1
 
-    def _update_with_bytes(mut self, data: Span[Byte, _]):
-        self.update_bytes(data)
-
     def _update_with_simd(mut self, value: SIMD[_, _]):
         var bytes = simd_lanes_be_u64(value)
         self.update_bytes(bytes[:])
-
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
 
     def _finalize(mut self):
         var original_length = self._bit_length
@@ -232,18 +214,104 @@ struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
         self._buffer_len += 8
         self._process_buffer()
 
-    def digest(var self) -> List[UInt8]:
+    def digest(mut self) -> List[UInt8]:
         self._finalize()
         var output = List[UInt8](capacity=32)
         for i in range(8):
             append_be_u32(output, self._h[i])
         return output^
 
-    def hexdigest(var self) -> String:
-        return bytes_to_hex(self^.digest())
+    def hexdigest(mut self) -> String:
+        return bytes_to_hex(self.digest())
 
-    def finish(var self) -> UInt64:
+    def finish(mut self) -> UInt64:
         self._finalize()
         return (self._h[0].cast[DType.uint64]() << UInt64(32)) | self._h[
             1
         ].cast[DType.uint64]()
+
+
+struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
+    comptime block_size = 64
+    comptime digest_size = 32
+
+    var _core: _SHA256Core
+
+    def __init__(out self):
+        self._core = _SHA256Core(
+            [
+                0x6A09E667,
+                0xBB67AE85,
+                0x3C6EF372,
+                0xA54FF53A,
+                0x510E527F,
+                0x9B05688C,
+                0x1F83D9AB,
+                0x5BE0CD19,
+            ]
+        )
+
+    def update_bytes(mut self, data: Span[Byte, _]):
+        self._core.update_bytes(data)
+
+    def _update_with_bytes(mut self, data: Span[Byte, _]):
+        self._core.update_bytes(data)
+
+    def _update_with_simd(mut self, value: SIMD[_, _]):
+        self._core._update_with_simd(value)
+
+    def update(mut self, value: Some[Hashable]):
+        value.__hash__(self)
+
+    def digest(var self) -> List[UInt8]:
+        return self._core.digest()
+
+    def hexdigest(var self) -> String:
+        return self._core.hexdigest()
+
+    def finish(var self) -> UInt64:
+        return self._core.finish()
+
+
+struct SHA224(Copyable, Defaultable, HashFunction, Hasher, Movable):
+    comptime block_size = 64
+    comptime digest_size = 28
+
+    var _core: _SHA256Core
+
+    def __init__(out self):
+        self._core = _SHA256Core(
+            [
+                0xC1059ED8,
+                0x367CD507,
+                0x3070DD17,
+                0xF70E5939,
+                0xFFC00B31,
+                0x68581511,
+                0x64F98FA7,
+                0xBEFA4FA4,
+            ]
+        )
+
+    def update_bytes(mut self, data: Span[Byte, _]):
+        self._core.update_bytes(data)
+
+    def _update_with_bytes(mut self, data: Span[Byte, _]):
+        self._core.update_bytes(data)
+
+    def _update_with_simd(mut self, value: SIMD[_, _]):
+        self._core._update_with_simd(value)
+
+    def update(mut self, value: Some[Hashable]):
+        value.__hash__(self)
+
+    def digest(var self) -> List[UInt8]:
+        var full = self._core.digest()
+        full.resize(28, 0)
+        return full^
+
+    def hexdigest(var self) -> String:
+        return bytes_to_hex(self^.digest())
+
+    def finish(var self) -> UInt64:
+        return self._core.finish()

@@ -34,6 +34,7 @@ FFI、Python、OpenSSL、既存の`hash`パッケージには依存しない。
 ```text
 crypto
 ├── md5
+├── sha1
 ├── sha256
 ├── sha512
 ├── sha3
@@ -46,7 +47,8 @@ crypto
 ```
 
 `crypto.md5`は`MD5`を公開する。
-`crypto.sha256`は`SHA256`を公開する。
+`crypto.sha1`は`SHA1`を公開する。
+`crypto.sha256`は`SHA224`と`SHA256`を公開する。
 `crypto.sha512`は`SHA384`と`SHA512`を公開する。
 `crypto.sha3`は`SHA3_256`を公開する。
 `crypto.blake2b`は`BLAKE2b`を公開する。
@@ -61,7 +63,7 @@ crypto
 `crypto.__init__`はサブモジュールの型や関数を一括で再公開しない。
 
 HMAC、HKDF、PBKDF2はSHA-256、SHA-384、SHA-512だけを正式にサポートする。
-MD5は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
+MD5とSHA-1は既存データとの互換用途に限り、新しいセキュリティ用途には使えないことを文書化する。
 
 ## 公開API
 
@@ -217,7 +219,8 @@ Mojo標準の`std.random`は暗号学的に安全ではないため使用しな�
 ## テスト
 
 ハッシュには既存の`hash-mojo`テストを移植する。
-対象はMD5、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3である。
+対象はMD5、SHA-1、SHA-224、SHA-256、SHA-384、SHA-512、SHA3-256、BLAKE2b、BLAKE3である。
+SHA-1とSHA-224は既知の固定ベクトルで検証する。空入力、短いASCII入力、複数回の`update_bytes`と一括入力の一致を含める。
 
 HMACはRFC 4231のSHA-256、SHA-384、SHA-512テストベクトルで検証する。
 一つの入力を一度に渡した結果と複数回の`update_bytes`で渡した結果が一致することも検証する。
@@ -258,7 +261,6 @@ READMEはMD5の用途制限、一定時間実行、秘密値消去、外部監�
 
 次の項目はこのマイルストーンに含めない。
 
-- SHA-224とSHA-1
 - HMAC-SHA3とHMAC-BLAKE
 - HKDFのreader API
 - 状態のreset、clone、serialize

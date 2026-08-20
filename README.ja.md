@@ -14,7 +14,8 @@
 
 ```mojo
 from crypto.md5 import MD5
-from crypto.sha256 import SHA256
+from crypto.sha1 import SHA1
+from crypto.sha256 import SHA224, SHA256
 from crypto.sha512 import SHA384, SHA512
 from crypto.sha3 import SHA3_256
 from crypto.blake2b import BLAKE2b
@@ -28,8 +29,8 @@ print(sha256^.hexdigest())
 `BLAKE2b`の`digest_size`には1から64までのbyte数を指定できます。
 `BLAKE3`は32-byte鍵を受け取るkeyed hashと、`digest_xof()`および`hexdigest_xof()`による0以上の長さの可変長出力を提供します。
 
-MD5は既存データや古い形式との互換性確認に限って使用してください。
-MD5は衝突耐性が必要な新しい設計、署名、証明書、パスワード保存には適しません。
+MD5とSHA-1は既存データや古い形式との互換性確認に限って使用してください。
+いずれも衝突耐性が必要な新しい設計、署名、証明書、パスワード保存には適しません。
 
 HMACはSHA-256、SHA-384、SHA-512のストリーミング型とワンショット関数を提供します。
 

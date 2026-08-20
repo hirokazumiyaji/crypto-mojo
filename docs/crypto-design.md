@@ -34,6 +34,7 @@ Split the public package into these modules:
 ```text
 crypto
 ├── md5
+├── sha1
 ├── sha256
 ├── sha512
 ├── sha3
@@ -46,7 +47,8 @@ crypto
 ```
 
 `crypto.md5` exports `MD5`.
-`crypto.sha256` exports `SHA256`.
+`crypto.sha1` exports `SHA1`.
+`crypto.sha256` exports `SHA224` and `SHA256`.
 `crypto.sha512` exports `SHA384` and `SHA512`.
 `crypto.sha3` exports `SHA3_256`.
 `crypto.blake2b` exports `BLAKE2b`.
@@ -61,7 +63,7 @@ Each hash type continues to conform to Mojo's standard `std.hashlib.Hasher` trai
 `crypto.__init__` does not re-export submodule types or functions in bulk.
 
 HMAC, HKDF, and PBKDF2 officially support only SHA-256, SHA-384, and SHA-512.
-Document that MD5 is for compatibility with existing data only and must not be used for new security purposes.
+Document that MD5 and SHA-1 are for compatibility with existing data only and must not be used for new security purposes.
 
 ## Public API
 
@@ -217,7 +219,8 @@ Cryptographic random number generation is out of scope for this milestone.
 ## Testing
 
 Port the existing `hash-mojo` tests for hashing.
-Cover MD5, SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3.
+Cover MD5, SHA-1, SHA-224, SHA-256, SHA-384, SHA-512, SHA3-256, BLAKE2b, and BLAKE3.
+Verify SHA-1 and SHA-224 against well-known fixed vectors, including empty input, short ASCII input, and multi-`update_bytes` versus one-shot input.
 
 Verify HMAC against RFC 4231 test vectors for SHA-256, SHA-384, and SHA-512.
 Also verify that passing one input at once matches results from multiple `update_bytes` calls.
@@ -258,7 +261,6 @@ It also states the boundaries for MD5 use, constant-time execution, secret zeroi
 
 This milestone does not include:
 
-- SHA-224 and SHA-1
 - HMAC-SHA3 and HMAC-BLAKE
 - An HKDF reader API
 - State reset, clone, or serialize

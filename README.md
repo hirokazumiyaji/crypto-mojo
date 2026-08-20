@@ -14,7 +14,8 @@ Hash types conform to Mojo's standard `std.hashlib.Hasher` trait.
 
 ```mojo
 from crypto.md5 import MD5
-from crypto.sha256 import SHA256
+from crypto.sha1 import SHA1
+from crypto.sha256 import SHA224, SHA256
 from crypto.sha512 import SHA384, SHA512
 from crypto.sha3 import SHA3_256
 from crypto.blake2b import BLAKE2b
@@ -28,8 +29,8 @@ print(sha256^.hexdigest())
 `BLAKE2b` accepts a `digest_size` from 1 to 64 bytes.
 `BLAKE3` provides keyed hashing with a 32-byte key, plus variable-length output of length 0 or greater via `digest_xof()` and `hexdigest_xof()`.
 
-Use MD5 only to check compatibility with existing data or legacy formats.
-MD5 is not suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
+Use MD5 and SHA-1 only to check compatibility with existing data or legacy formats.
+Neither is suitable for new designs that need collision resistance, or for signatures, certificates, or password storage.
 
 HMAC provides streaming types and one-shot functions for SHA-256, SHA-384, and SHA-512.
 
