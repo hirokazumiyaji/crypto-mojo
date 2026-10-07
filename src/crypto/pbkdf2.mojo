@@ -35,7 +35,7 @@ def derive[
     for block_index in range(1, count + 1):
         var first = keyed.copy()
         first.update_bytes(salt)
-        var suffix = InlineArray[UInt8, 4](fill=0)
+        var suffix = Array[UInt8, 4](fill=0)
         for i in range(4):
             suffix[i] = UInt8((block_index >> (24 - i * 8)) & 0xFF)
         first.update_bytes(Span(suffix))

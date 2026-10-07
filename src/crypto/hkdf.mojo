@@ -31,7 +31,7 @@ def expand[
         var mac = keyed.copy()
         mac.update_bytes(previous[:])
         mac.update_bytes(info)
-        var suffix = InlineArray[UInt8, 1](fill=UInt8(counter))
+        var suffix = Array[UInt8, 1](fill=UInt8(counter))
         mac.update_bytes(Span(suffix))
         previous = mac^.digest()
         var take = min(len(previous), length - len(output))
@@ -165,7 +165,7 @@ struct _HKDFReader[H: HashFunction](Copyable, Movable):
                 var mac = HMAC[Self.H](self._prk[:])
                 mac.update_bytes(self._previous[:])
                 mac.update_bytes(self._info[:])
-                var suffix = InlineArray[UInt8, 1](fill=UInt8(self._counter))
+                var suffix = Array[UInt8, 1](fill=UInt8(self._counter))
                 mac.update_bytes(Span(suffix))
                 self._previous = mac^.digest()
                 self._previous_offset = 0

@@ -16,7 +16,7 @@ comptime _HEX_DIGITS: StaticString = "0123456789abcdef"
 
 
 def _bytes_to_hex(data: List[UInt8]) -> String:
-    var output = String(capacity=2 * len(data))
+    var output = String(capacity_bytes=2 * len(data))
     for value in data:
         output += String(_HEX_DIGITS[byte=Int(value >> 4)])
         output += String(_HEX_DIGITS[byte=Int(value & 0x0F)])

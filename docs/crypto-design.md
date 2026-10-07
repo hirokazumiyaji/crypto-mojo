@@ -293,7 +293,7 @@ Also provide a consumer test that imports only the precompiled `crypto.mojoc`.
 
 ## CI and distribution
 
-Pixi manages Mojo 1.0 and adds no library dependencies beyond the standard library.
+Pixi manages Mojo 1.1.0 and adds no library dependencies beyond the standard library.
 Target platforms are Linux x86-64 and macOS arm64.
 
 CI runs:

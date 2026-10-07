@@ -19,7 +19,7 @@ trait HashFunction(Copyable, Defaultable, Deinitable, Movable):
 
 
 def bytes_to_hex(data: List[UInt8]) -> String:
-    var output = String(capacity=len(data) * 2)
+    var output = String(capacity_bytes=len(data) * 2)
     for value in data:
         output += _HEX_DIGITS[byte=Int(value >> 4)]
         output += _HEX_DIGITS[byte=Int(value & 0x0F)]
@@ -72,7 +72,7 @@ def load_le_u64_words[
 def copy_to_buffer[
     size: Int
 ](
-    mut buffer: InlineArray[UInt8, size],
+    mut buffer: Array[UInt8, size],
     offset: Int,
     data: Span[Byte, _],
     start: Int,
@@ -88,7 +88,7 @@ def copy_to_buffer[
 @always_inline
 def write_le_u64[
     size: Int
-](mut buffer: InlineArray[UInt8, size], offset: Int, value: UInt64):
+](mut buffer: Array[UInt8, size], offset: Int, value: UInt64):
     buffer.unsafe_ptr().unsafe_offset(offset).unsafe_store(
         bitcast[DType.uint8, 8](SIMD[DType.uint64, 1](value))
     )
@@ -97,7 +97,7 @@ def write_le_u64[
 @always_inline
 def write_be_u64[
     size: Int
-](mut buffer: InlineArray[UInt8, size], offset: Int, value: UInt64):
+](mut buffer: Array[UInt8, size], offset: Int, value: UInt64):
     write_le_u64(buffer, offset, byte_swap(value))
 
 

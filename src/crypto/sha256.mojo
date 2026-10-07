@@ -118,21 +118,21 @@ def _small_sigma_one(value: UInt32) -> UInt32:
 
 
 @always_inline
-def _load_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
-    var words = InlineArray[UInt32, 16](uninitialized=True)
+def _load_words(block: Span[Byte, _]) -> Array[UInt32, 16]:
+    var words = Array[UInt32, 16](uninitialized=True)
     words.unsafe_ptr().unsafe_store(byte_swap(load_le_u32_words[16](block, 0)))
     return words^
 
 
 struct _SHA256Core(Copyable, Movable):
-    var _h: InlineArray[UInt32, 8]
-    var _buffer: InlineArray[UInt8, 64]
+    var _h: Array[UInt32, 8]
+    var _buffer: Array[UInt8, 64]
     var _buffer_len: Int
     var _bit_length: UInt64
 
-    def __init__(out self, var initial_h: InlineArray[UInt32, 8]):
+    def __init__(out self, var initial_h: Array[UInt32, 8]):
         self._h = initial_h^
-        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer = Array[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
 
@@ -141,7 +141,7 @@ struct _SHA256Core(Copyable, Movable):
         self._process_words(_load_words(block))
 
     @always_inline
-    def _process_words(mut self, var words: InlineArray[UInt32, 16]):
+    def _process_words(mut self, var words: Array[UInt32, 16]):
         var a = self._h[0]
         var b = self._h[1]
         var c = self._h[2]
@@ -275,8 +275,8 @@ struct SHA256(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def _update_with_simd(mut self, value: SIMD[_, _]):
         self._core._update_with_simd(value)
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()
@@ -334,8 +334,8 @@ struct SHA224(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def _update_with_simd(mut self, value: SIMD[_, _]):
         self._core._update_with_simd(value)
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()

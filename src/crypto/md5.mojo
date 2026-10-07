@@ -148,21 +148,21 @@ comptime _K = [
 
 
 @always_inline
-def _block_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
-    var words = InlineArray[UInt32, 16](uninitialized=True)
+def _block_words(block: Span[Byte, _]) -> Array[UInt32, 16]:
+    var words = Array[UInt32, 16](uninitialized=True)
     words.unsafe_ptr().unsafe_store(load_le_u32_words[16](block, 0))
     return words^
 
 
 struct MD5(Copyable, Defaultable, Hasher, Movable):
-    var _state: InlineArray[UInt32, 4]
-    var _buffer: InlineArray[UInt8, 64]
+    var _state: Array[UInt32, 4]
+    var _buffer: Array[UInt8, 64]
     var _buffer_len: Int
     var _bit_length: UInt64
 
     def __init__(out self):
         self._state = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476]
-        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer = Array[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
 
@@ -171,7 +171,7 @@ struct MD5(Copyable, Defaultable, Hasher, Movable):
         self._process_words(_block_words(block))
 
     @always_inline
-    def _process_words(mut self, words: InlineArray[UInt32, 16]):
+    def _process_words(mut self, words: Array[UInt32, 16]):
         var a = self._state[0]
         var b = self._state[1]
         var c = self._state[2]
@@ -232,15 +232,15 @@ struct MD5(Copyable, Defaultable, Hasher, Movable):
         var bytes = simd_lanes_le_u64(value)
         self.update_bytes(bytes[:])
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()
 
     def reset(mut self):
         self._state = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476]
-        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer = Array[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
 

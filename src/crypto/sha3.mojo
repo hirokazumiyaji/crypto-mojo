@@ -51,8 +51,8 @@ comptime _ROTATION_OFFSETS: List[List[Int]] = [
 
 
 @always_inline
-def _block_lanes(block: Span[Byte, _]) -> InlineArray[UInt64, 17]:
-    var lanes = InlineArray[UInt64, 17](uninitialized=True)
+def _block_lanes(block: Span[Byte, _]) -> Array[UInt64, 17]:
+    var lanes = Array[UInt64, 17](uninitialized=True)
     lanes.unsafe_ptr().unsafe_store(load_le_u64_words[16](block, 0))
     lanes[16] = read_le_u64(block, 128)
     return lanes^
@@ -62,22 +62,22 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
     comptime block_size = 136
     comptime digest_size = 32
 
-    var _state: InlineArray[UInt64, 25]
-    var _buffer: InlineArray[UInt8, 136]
+    var _state: Array[UInt64, 25]
+    var _buffer: Array[UInt8, 136]
     var _buffer_len: Int
 
     def __init__(out self):
-        self._state = InlineArray[UInt64, 25](fill=0)
-        self._buffer = InlineArray[UInt8, 136](fill=0)
+        self._state = Array[UInt64, 25](fill=0)
+        self._buffer = Array[UInt8, 136](fill=0)
         self._buffer_len = 0
 
     def _permute(mut self):
         # Work on a local copy so the state lives in registers instead of
         # going through `self` on every access.
         var state = self._state.copy()
-        var c = InlineArray[UInt64, 5](uninitialized=True)
-        var d = InlineArray[UInt64, 5](uninitialized=True)
-        var b = InlineArray[UInt64, 5 * 5](uninitialized=True)
+        var c = Array[UInt64, 5](uninitialized=True)
+        var d = Array[UInt64, 5](uninitialized=True)
+        var b = Array[UInt64, 5 * 5](uninitialized=True)
         comptime for round in range(24):
             comptime for x in range(5):
                 c[x] = (
@@ -106,7 +106,7 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
         self._state = state^
 
     @always_inline
-    def _absorb(mut self, lanes: InlineArray[UInt64, 17]):
+    def _absorb(mut self, lanes: Array[UInt64, 17]):
         for i in range(17):
             self._state[i] ^= lanes[i]
         self._permute()
@@ -140,15 +140,15 @@ struct SHA3_256(Copyable, Defaultable, HashFunction, Hasher, Movable):
         var bytes = simd_lanes_le_u64(value)
         self.update_bytes(bytes[:])
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()
 
     def reset(mut self):
-        self._state = InlineArray[UInt64, 25](fill=0)
-        self._buffer = InlineArray[UInt8, 136](fill=0)
+        self._state = Array[UInt64, 25](fill=0)
+        self._buffer = Array[UInt8, 136](fill=0)
         self._buffer_len = 0
 
     def _finalize(mut self):
