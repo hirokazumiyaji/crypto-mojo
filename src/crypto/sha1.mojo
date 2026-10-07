@@ -14,8 +14,8 @@ from ._common import (
 
 
 @always_inline
-def _load_words(block: Span[Byte, _]) -> InlineArray[UInt32, 16]:
-    var words = InlineArray[UInt32, 16](uninitialized=True)
+def _load_words(block: Span[Byte, _]) -> Array[UInt32, 16]:
+    var words = Array[UInt32, 16](uninitialized=True)
     words.unsafe_ptr().unsafe_store(byte_swap(load_le_u32_words[16](block, 0)))
     return words^
 
@@ -24,8 +24,8 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
     comptime block_size = 64
     comptime digest_size = 20
 
-    var _h: InlineArray[UInt32, 5]
-    var _buffer: InlineArray[UInt8, 64]
+    var _h: Array[UInt32, 5]
+    var _buffer: Array[UInt8, 64]
     var _buffer_len: Int
     var _bit_length: UInt64
 
@@ -37,7 +37,7 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
             0x10325476,
             0xC3D2E1F0,
         ]
-        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer = Array[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
 
@@ -46,7 +46,7 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
         self._process_words(_load_words(block))
 
     @always_inline
-    def _process_words(mut self, var words: InlineArray[UInt32, 16]):
+    def _process_words(mut self, var words: Array[UInt32, 16]):
         var a = self._h[0]
         var b = self._h[1]
         var c = self._h[2]
@@ -119,8 +119,8 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
         var bytes = simd_lanes_be_u64(value)
         self.update_bytes(bytes[:])
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()
@@ -133,7 +133,7 @@ struct SHA1(Copyable, Defaultable, HashFunction, Hasher, Movable):
             0x10325476,
             0xC3D2E1F0,
         ]
-        self._buffer = InlineArray[UInt8, 64](fill=0)
+        self._buffer = Array[UInt8, 64](fill=0)
         self._buffer_len = 0
         self._bit_length = 0
 

@@ -25,4 +25,4 @@ precompile = "mojo precompile src/crypto -o /tmp/crypto.mojoc"
 test-consumer = { cmd = "mojo run -I /tmp conda.recipe/test.mojo", depends-on = ["precompile"] }
 
 [dependencies]
-mojo = ">=1.0.0,<2"
+mojo = ">=1.1.0,<1.2"

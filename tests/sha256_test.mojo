@@ -165,7 +165,7 @@ def test_sha256_finish_endianness() raises:
 
 def test_sha256_standard_hasher_finish() raises:
     var hasher = SHA256()
-    hasher.update(UInt32(42))
+    UInt32(42).__hash__(hasher)
     var value = hasher^.finish()
     assert_equal(value, 12014217582344364938)
 

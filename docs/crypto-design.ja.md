@@ -293,7 +293,7 @@ precompileした`crypto.mojoc`だけをimportするconsumer testも用意する�
 
 ## CIと配布
 
-PixiはMojo 1.0系を管理し、標準ライブラリ以外のライブラリ依存を追加しない。
+PixiはMojo 1.1.0を管理し、標準ライブラリ以外のライブラリ依存を追加しない。
 対象プラットフォームはLinux x86-64とmacOS arm64とする。
 
 CIは次の処理を実行する。

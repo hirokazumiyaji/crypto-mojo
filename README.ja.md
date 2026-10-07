@@ -116,7 +116,7 @@ fill(nonce[:])
 
 ## ローカル開発
 
-PixiはMojo 1.0系と`osx-arm64`および`linux-64`のlockfileを管理します。
+PixiはMojo 1.1.0と`osx-arm64`および`linux-64`のlockfileを管理します。
 
 ```bash
 pixi install --locked

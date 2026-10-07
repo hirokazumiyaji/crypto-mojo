@@ -14,7 +14,7 @@ struct HMAC[H: HashFunction](Copyable, Movable):
     var _inner_init: Self.H
 
     def __init__(out self, key: Span[Byte, _]):
-        var block = InlineArray[UInt8, Self.H.block_size](fill=0)
+        var block = Array[UInt8, Self.H.block_size](fill=0)
         if len(key) > Self.H.block_size:
             var hasher = Self.H()
             hasher.update_bytes(key)

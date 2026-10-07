@@ -39,7 +39,7 @@ comptime _SIGMA: List[List[Int]] = [
 
 @always_inline
 def _g(
-    mut v: InlineArray[UInt64, 16],
+    mut v: Array[UInt64, 16],
     a: Int,
     b: Int,
     c: Int,
@@ -58,15 +58,15 @@ def _g(
 
 
 @always_inline
-def _block_words(block: Span[Byte, _]) -> InlineArray[UInt64, 16]:
-    var words = InlineArray[UInt64, 16](uninitialized=True)
+def _block_words(block: Span[Byte, _]) -> Array[UInt64, 16]:
+    var words = Array[UInt64, 16](uninitialized=True)
     words.unsafe_ptr().unsafe_store(load_le_u64_words[16](block, 0))
     return words^
 
 
 struct _BLAKE2bCore(Copyable, Movable):
-    var _h: InlineArray[UInt64, 8]
-    var _buffer: InlineArray[UInt8, 128]
+    var _h: Array[UInt64, 8]
+    var _buffer: Array[UInt8, 128]
     var _buffer_len: Int
     var _t0: UInt64
     var _t1: UInt64
@@ -74,7 +74,7 @@ struct _BLAKE2bCore(Copyable, Movable):
     var _digest_size: Int
 
     def __init__(out self, digest_size: Int = 64):
-        self._h = InlineArray[UInt64, 8](uninitialized=True)
+        self._h = Array[UInt64, 8](uninitialized=True)
         var parameter = (
             UInt64(digest_size)
             | (UInt64(1) << UInt64(16))
@@ -83,7 +83,7 @@ struct _BLAKE2bCore(Copyable, Movable):
         comptime for i in range(8):
             self._h[i] = materialize[_IV[i]]()
         self._h[0] ^= parameter
-        self._buffer = InlineArray[UInt8, 128](fill=0)
+        self._buffer = Array[UInt8, 128](fill=0)
         self._buffer_len = 0
         self._t0 = 0
         self._t1 = 0
@@ -97,8 +97,8 @@ struct _BLAKE2bCore(Copyable, Movable):
             self._t1 += 1
 
     @always_inline
-    def _compress_words(mut self, m: InlineArray[UInt64, 16]):
-        var v = InlineArray[UInt64, 16](uninitialized=True)
+    def _compress_words(mut self, m: Array[UInt64, 16]):
+        var v = Array[UInt64, 16](uninitialized=True)
         comptime for i in range(8):
             v[i] = self._h[i]
             v[i + 8] = materialize[_IV[i]]()
@@ -219,8 +219,8 @@ struct BLAKE2b(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def _update_with_simd(mut self, value: SIMD[_, _]):
         self._core._update_with_simd(value)
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()

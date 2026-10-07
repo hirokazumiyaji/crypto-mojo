@@ -132,7 +132,7 @@ def test_md5_finish_endianness() raises:
 
 def test_md5_standard_hasher_finish() raises:
     var hasher = MD5()
-    hasher.update(UInt32(42))
+    UInt32(42).__hash__(hasher)
     var value = hasher^.finish()
     assert_equal(value, 7885250272287768040)
 

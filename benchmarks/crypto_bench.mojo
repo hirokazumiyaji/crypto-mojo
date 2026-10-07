@@ -37,226 +37,235 @@ def _bytes_measure(nbytes: Int) -> List[ThroughputMeasure]:
 
 
 @always_inline
-def _bench_sha256_1k(mut b: Bencher) raises capturing:
+def _bench_sha256_1k(mut b: Bencher) raises:
     var buf = _filled(_SIZE_1K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var hasher = SHA256()
         hasher.update_bytes(buf[:])
         var digest = hasher^.digest()
         keep(digest[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_sha256_64k(mut b: Bencher) raises capturing:
+def _bench_sha256_64k(mut b: Bencher) raises:
     var buf = _filled(_SIZE_64K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var hasher = SHA256()
         hasher.update_bytes(buf[:])
         var digest = hasher^.digest()
         keep(digest[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_sha512_64k(mut b: Bencher) raises capturing:
+def _bench_sha512_64k(mut b: Bencher) raises:
     var buf = _filled(_SIZE_64K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var hasher = SHA512()
         hasher.update_bytes(buf[:])
         var digest = hasher^.digest()
         keep(digest[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_sha3_256_64k(mut b: Bencher) raises capturing:
+def _bench_sha3_256_64k(mut b: Bencher) raises:
     var buf = _filled(_SIZE_64K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var hasher = SHA3_256()
         hasher.update_bytes(buf[:])
         var digest = hasher^.digest()
         keep(digest[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_blake2b_64k(mut b: Bencher) raises capturing:
+def _bench_blake2b_64k(mut b: Bencher) raises:
     var buf = _filled(_SIZE_64K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var hasher = BLAKE2b()
         hasher.update_bytes(buf[:])
         var digest = hasher^.digest()
         keep(digest[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_blake3_64k(mut b: Bencher) raises capturing:
+def _bench_blake3_64k(mut b: Bencher) raises:
     var buf = _filled(_SIZE_64K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var hasher = BLAKE3()
         hasher.update_bytes(buf[:])
         var digest = hasher^.digest()
         keep(digest[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_hmac_sha256_64k(mut b: Bencher) raises capturing:
+def _bench_hmac_sha256_64k(mut b: Bencher) raises:
     var key = _filled(32, 0x0B)
     var msg = _filled(_SIZE_64K)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var tag = hmac_sha256(key[:], msg[:])
         keep(tag[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(key[0])
     keep(msg[0])
 
 
 @always_inline
-def _bench_hkdf_expand_1k(mut b: Bencher) raises capturing:
+def _bench_hkdf_expand_1k(mut b: Bencher) raises:
     var salt = _filled(16, 0x01)
     var ikm = _filled(32, 0x02)
     var info = _filled(8, 0x03)
     var prk = extract_sha256(salt[:], ikm[:])
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var okm = expand_sha256(prk[:], info[:], 1024)
         keep(okm[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(prk[0])
     keep(info[0])
 
 
 @always_inline
-def _bench_hkdf_reader_1k(mut b: Bencher) raises capturing:
+def _bench_hkdf_reader_1k(mut b: Bencher) raises:
     var salt = _filled(16, 0x01)
     var ikm = _filled(32, 0x02)
     var info = _filled(8, 0x03)
     var prk = extract_sha256(salt[:], ikm[:])
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var reader = reader_sha256(prk[:], info[:])
         var okm = reader.read(1024)
         keep(okm[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(prk[0])
     keep(info[0])
 
 
 @always_inline
-def _bench_pbkdf2_sha256(mut b: Bencher) raises capturing:
+def _bench_pbkdf2_sha256(mut b: Bencher) raises:
     var password = _filled(16, 0x70)
     var salt = _filled(16, 0x73)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {imm}:
         var out = pbkdf2_sha256(password[:], salt[:], _PBKDF2_ITERS, 32)
         keep(out[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(password[0])
     keep(salt[0])
 
 
 @always_inline
-def _bench_rand_1k(mut b: Bencher) raises capturing:
+def _bench_rand_1k(mut b: Bencher) raises:
     var buf = List[UInt8](length=_SIZE_1K, fill=0)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {mut buf}:
         fill(buf[:])
         keep(buf[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 @always_inline
-def _bench_rand_64k(mut b: Bencher) raises capturing:
+def _bench_rand_64k(mut b: Bencher) raises:
     var buf = List[UInt8](length=_SIZE_64K, fill=0)
 
     @always_inline
-    def work() raises capturing:
+    def work() raises {mut buf}:
         fill(buf[:])
         keep(buf[0])
 
-    b.iter[work]()
+    b.iter(work)
     keep(buf[0])
 
 
 def main() raises:
     var m = Bench(BenchConfig())
 
-    m.bench_function[_bench_sha256_1k](
-        BenchId("sha256/1KiB"), _bytes_measure(_SIZE_1K)
+    m.bench_function(
+        _bench_sha256_1k, BenchId("sha256/1KiB"), _bytes_measure(_SIZE_1K)
     )
-    m.bench_function[_bench_sha256_64k](
-        BenchId("sha256/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_sha256_64k, BenchId("sha256/64KiB"), _bytes_measure(_SIZE_64K)
     )
-    m.bench_function[_bench_sha512_64k](
-        BenchId("sha512/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_sha512_64k, BenchId("sha512/64KiB"), _bytes_measure(_SIZE_64K)
     )
-    m.bench_function[_bench_sha3_256_64k](
-        BenchId("sha3_256/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_sha3_256_64k,
+        BenchId("sha3_256/64KiB"),
+        _bytes_measure(_SIZE_64K),
     )
-    m.bench_function[_bench_blake2b_64k](
-        BenchId("blake2b/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_blake2b_64k, BenchId("blake2b/64KiB"), _bytes_measure(_SIZE_64K)
     )
-    m.bench_function[_bench_blake3_64k](
-        BenchId("blake3/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_blake3_64k, BenchId("blake3/64KiB"), _bytes_measure(_SIZE_64K)
     )
-    m.bench_function[_bench_hmac_sha256_64k](
-        BenchId("hmac_sha256/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_hmac_sha256_64k,
+        BenchId("hmac_sha256/64KiB"),
+        _bytes_measure(_SIZE_64K),
     )
-    m.bench_function[_bench_hkdf_expand_1k](
-        BenchId("hkdf_expand_sha256/1KiB"), _bytes_measure(1024)
+    m.bench_function(
+        _bench_hkdf_expand_1k,
+        BenchId("hkdf_expand_sha256/1KiB"),
+        _bytes_measure(1024),
     )
-    m.bench_function[_bench_hkdf_reader_1k](
-        BenchId("hkdf_reader_sha256/1KiB"), _bytes_measure(1024)
+    m.bench_function(
+        _bench_hkdf_reader_1k,
+        BenchId("hkdf_reader_sha256/1KiB"),
+        _bytes_measure(1024),
     )
-    m.bench_function[_bench_pbkdf2_sha256](
+    m.bench_function(
+        _bench_pbkdf2_sha256,
         BenchId("pbkdf2_sha256/1000iters"),
         [ThroughputMeasure(BenchMetric.elements, 1)],
         fixed_iterations=20,
     )
-    m.bench_function[_bench_rand_1k](
-        BenchId("rand_fill/1KiB"), _bytes_measure(_SIZE_1K)
+    m.bench_function(
+        _bench_rand_1k, BenchId("rand_fill/1KiB"), _bytes_measure(_SIZE_1K)
     )
-    m.bench_function[_bench_rand_64k](
-        BenchId("rand_fill/64KiB"), _bytes_measure(_SIZE_64K)
+    m.bench_function(
+        _bench_rand_64k, BenchId("rand_fill/64KiB"), _bytes_measure(_SIZE_64K)
     )
 
     m.dump_report()

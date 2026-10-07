@@ -44,7 +44,7 @@ comptime _KEYED_HASH = UInt32(16)
 
 @always_inline
 def _g(
-    mut v: InlineArray[UInt32, 16],
+    mut v: Array[UInt32, 16],
     a: Int,
     b: Int,
     c: Int,
@@ -64,13 +64,13 @@ def _g(
 
 @always_inline
 def _compress(
-    input_cv: InlineArray[UInt32, 8],
-    block_words: InlineArray[UInt32, 16],
+    input_cv: Array[UInt32, 8],
+    block_words: Array[UInt32, 16],
     counter: UInt64,
     block_len: UInt32,
     flags: UInt32,
-) -> InlineArray[UInt32, 16]:
-    var v = InlineArray[UInt32, 16](uninitialized=True)
+) -> Array[UInt32, 16]:
+    var v = Array[UInt32, 16](uninitialized=True)
     comptime for i in range(8):
         v[i] = input_cv[i]
         v[i + 8] = materialize[_IV[i]]()
@@ -154,7 +154,7 @@ def _compress(
             block_words[materialize[s[15]]()],
         )
 
-    var output = InlineArray[UInt32, 16](uninitialized=True)
+    var output = Array[UInt32, 16](uninitialized=True)
     for i in range(8):
         output[i] = v[i] ^ v[i + 8]
         output[i + 8] = v[i + 8] ^ input_cv[i]
@@ -162,10 +162,10 @@ def _compress(
 
 
 @always_inline
-def _bytes_to_words(data: Span[Byte, _]) -> InlineArray[UInt32, 16]:
+def _bytes_to_words(data: Span[Byte, _]) -> Array[UInt32, 16]:
     if len(data) == 64:
         return _full_block_words(data, 0)
-    var words = InlineArray[UInt32, 16](fill=0)
+    var words = Array[UInt32, 16](fill=0)
     var full_words = len(data) // 4
     for i in range(full_words):
         words[i] = read_le_u32(data, i * 4)
@@ -175,25 +175,23 @@ def _bytes_to_words(data: Span[Byte, _]) -> InlineArray[UInt32, 16]:
 
 
 @always_inline
-def _full_block_words(
-    data: Span[Byte, _], offset: Int
-) -> InlineArray[UInt32, 16]:
-    var words = InlineArray[UInt32, 16](uninitialized=True)
+def _full_block_words(data: Span[Byte, _], offset: Int) -> Array[UInt32, 16]:
+    var words = Array[UInt32, 16](uninitialized=True)
     words.unsafe_ptr().unsafe_store(load_le_u32_words[16](data, offset))
     return words^
 
 
 struct _BLAKE3Output:
-    var _input_cv: InlineArray[UInt32, 8]
-    var _block_words: InlineArray[UInt32, 16]
+    var _input_cv: Array[UInt32, 8]
+    var _block_words: Array[UInt32, 16]
     var _counter: UInt64
     var _block_len: UInt32
     var _flags: UInt32
 
     def __init__(
         out self,
-        input_cv: InlineArray[UInt32, 8],
-        block_words: InlineArray[UInt32, 16],
+        input_cv: Array[UInt32, 8],
+        block_words: Array[UInt32, 16],
         counter: UInt64,
         block_len: UInt32,
         flags: UInt32,
@@ -204,7 +202,7 @@ struct _BLAKE3Output:
         self._block_len = block_len
         self._flags = flags
 
-    def chaining_value(self) -> InlineArray[UInt32, 8]:
+    def chaining_value(self) -> Array[UInt32, 8]:
         var words = _compress(
             self._input_cv,
             self._block_words,
@@ -212,7 +210,7 @@ struct _BLAKE3Output:
             self._block_len,
             self._flags,
         )
-        var cv = InlineArray[UInt32, 8](uninitialized=True)
+        var cv = Array[UInt32, 8](uninitialized=True)
         for i in range(8):
             cv[i] = words[i]
         return cv^
@@ -232,22 +230,22 @@ struct _BLAKE3Output:
 
 
 struct _BLAKE3ChunkState(Copyable, Movable):
-    var _cv: InlineArray[UInt32, 8]
+    var _cv: Array[UInt32, 8]
     var _chunk_counter: UInt64
-    var _block: InlineArray[UInt8, 64]
+    var _block: Array[UInt8, 64]
     var _block_len: Int
     var _blocks_compressed: Int
     var _flags: UInt32
 
     def __init__(
         out self,
-        key_words: InlineArray[UInt32, 8],
+        key_words: Array[UInt32, 8],
         chunk_counter: UInt64,
         flags: UInt32,
     ):
         self._cv = key_words.copy()
         self._chunk_counter = chunk_counter
-        self._block = InlineArray[UInt8, 64](fill=0)
+        self._block = Array[UInt8, 64](fill=0)
         self._block_len = 0
         self._blocks_compressed = 0
         self._flags = flags
@@ -256,7 +254,7 @@ struct _BLAKE3ChunkState(Copyable, Movable):
         return self._blocks_compressed == 15 and self._block_len == 64
 
     @always_inline
-    def _apply_block(mut self, words: InlineArray[UInt32, 16]):
+    def _apply_block(mut self, words: Array[UInt32, 16]):
         var flags = self._flags
         if self._blocks_compressed == 0:
             flags |= _CHUNK_START
@@ -316,15 +314,15 @@ struct _BLAKE3ChunkState(Copyable, Movable):
         )
 
 
-def _initial_key_words() -> InlineArray[UInt32, 8]:
-    var words = InlineArray[UInt32, 8](uninitialized=True)
+def _initial_key_words() -> Array[UInt32, 8]:
+    var words = Array[UInt32, 8](uninitialized=True)
     comptime for i in range(8):
         words[i] = materialize[_IV[i]]()
     return words^
 
 
-def _key_words(key: Span[Byte, _]) -> InlineArray[UInt32, 8]:
-    var words = InlineArray[UInt32, 8](uninitialized=True)
+def _key_words(key: Span[Byte, _]) -> Array[UInt32, 8]:
+    var words = Array[UInt32, 8](uninitialized=True)
     for i in range(8):
         words[i] = read_le_u32(key, i * 4)
     return words^
@@ -333,31 +331,29 @@ def _key_words(key: Span[Byte, _]) -> InlineArray[UInt32, 8]:
 struct _BLAKE3Core(Copyable, Movable):
     # One chaining value per tree level; 54 levels cover the 2^64-byte
     # (2^54-chunk) input limit.
-    var _key_words: InlineArray[UInt32, 8]
+    var _key_words: Array[UInt32, 8]
     var _chunk: _BLAKE3ChunkState
-    var _stack: InlineArray[InlineArray[UInt32, 8], 54]
+    var _stack: Array[Array[UInt32, 8], 54]
     var _stack_len: Int
     var _flags: UInt32
 
     def __init__(
         out self,
-        key_words: InlineArray[UInt32, 8],
+        key_words: Array[UInt32, 8],
         flags: UInt32,
     ):
         self._key_words = key_words.copy()
         self._chunk = _BLAKE3ChunkState(key_words, 0, flags)
-        self._stack = InlineArray[InlineArray[UInt32, 8], 54](
-            fill=InlineArray[UInt32, 8](fill=0)
-        )
+        self._stack = Array[Array[UInt32, 8], 54](fill=Array[UInt32, 8](fill=0))
         self._stack_len = 0
         self._flags = flags
 
     def _parent_output(
         self,
-        left: InlineArray[UInt32, 8],
-        right: InlineArray[UInt32, 8],
+        left: Array[UInt32, 8],
+        right: Array[UInt32, 8],
     ) -> _BLAKE3Output:
-        var block_words = InlineArray[UInt32, 16](uninitialized=True)
+        var block_words = Array[UInt32, 16](uninitialized=True)
         for i in range(8):
             block_words[i] = left[i]
             block_words[i + 8] = right[i]
@@ -371,7 +367,7 @@ struct _BLAKE3Core(Copyable, Movable):
 
     def _push_chunk_cv(
         mut self,
-        cv: InlineArray[UInt32, 8],
+        cv: Array[UInt32, 8],
         chunk_counter: UInt64,
     ):
         var total_chunks = chunk_counter + 1
@@ -466,8 +462,8 @@ struct BLAKE3(Copyable, Defaultable, HashFunction, Hasher, Movable):
     def _update_with_simd(mut self, value: SIMD[_, _]):
         self._core._update_with_simd(value)
 
-    def update(mut self, value: Some[Hashable]):
-        value.__hash__(self)
+    def update(mut self, value: ImmSpan[Byte, _]):
+        self.update_bytes(value)
 
     def clone(self) -> Self:
         return self.copy()
