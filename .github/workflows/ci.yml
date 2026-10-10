@@ -36,7 +36,7 @@ jobs:
           git diff --exit-code -- src/crypto tests conda.recipe/test.mojo
 
       - name: Run tests
-        run: pixi run test
+        run: pixi run --environment test test
 
       - name: Precompile and test package
-        run: pixi run test-consumer
+        run: pixi run --environment test test-consumer
