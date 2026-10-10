@@ -1,5 +1,9 @@
 [workspace]
-channels = ["https://conda.modular.com/max", "conda-forge"]
+channels = [
+    "https://conda.modular.com/max",
+    "https://prefix.dev/hirokazumiyaji/mojo",
+    "conda-forge",
+]
 name = "crypto-mojo"
 platforms = ["osx-arm64", "linux-64"]
 version = "0.3.0"
@@ -20,9 +24,16 @@ test-hkdf = "mojo run -I src tests/hkdf_test.mojo"
 test-pbkdf2 = "mojo run -I src tests/pbkdf2_test.mojo"
 test-reset-clone = "mojo run -I src tests/reset_clone_test.mojo"
 test-rand = "mojo run -I src tests/rand_test.mojo"
-test = { depends-on = ["test-md5", "test-sha1", "test-sha256", "test-sha512", "test-sha3", "test-blake2b", "test-blake3", "test-subtle", "test-hmac", "test-hkdf", "test-pbkdf2", "test-reset-clone", "test-rand"] }
+test-properties = "mojo run -I src tests/property_test.mojo"
+test = { depends-on = ["test-md5", "test-sha1", "test-sha256", "test-sha512", "test-sha3", "test-blake2b", "test-blake3", "test-subtle", "test-hmac", "test-hkdf", "test-pbkdf2", "test-reset-clone", "test-rand", "test-properties"] }
 precompile = "mojo precompile src/crypto -o /tmp/crypto.mojoc"
 test-consumer = { cmd = "mojo run -I /tmp conda.recipe/test.mojo", depends-on = ["precompile"] }
+
+[feature.test.dependencies]
+proptest = "*"
+
+[environments]
+test = { features = ["default", "test"] }
 
 [dependencies]
 mojo = ">=1.1.0,<1.2"
